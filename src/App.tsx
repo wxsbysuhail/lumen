@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Onboarding } from './components/Onboarding';
 import { Dashboard } from './components/Dashboard';
 import { CashFlow } from './components/CashFlow';
@@ -21,6 +21,8 @@ import {
   RotateCcw,
   PieChart,
   LogOut,
+  Grid,
+  X,
 } from 'lucide-react';
 
 interface Transaction {
@@ -115,6 +117,61 @@ function App() {
 
   // Navigation
   const [activeTab, setActiveTab] = useState<'dashboard' | 'cashflow' | 'savings' | 'investments' | 'projection' | 'reports' | 'insights'>('dashboard');
+  const [showMoreHub, setShowMoreHub] = useState(false);
+  const [hideNav, setHideNav] = useState(false);
+
+  const isSecondaryTabActive = ['projection', 'reports', 'insights'].includes(activeTab);
+  const isMoreActive = isSecondaryTabActive || showMoreHub;
+
+  const navigateTo = (tab: typeof activeTab) => {
+    setActiveTab(tab);
+    setShowMoreHub(false);
+  };
+
+  const toggleMoreHub = () => {
+    setShowMoreHub(prev => !prev);
+  };
+
+  // Scroll detection to auto-hide bottom navigation bar on mobile
+  useEffect(() => {
+    let lastScrollY = window.scrollY;
+    let ticking = false;
+
+    const updateScrollDirection = () => {
+      const scrollY = window.scrollY;
+
+      if (Math.abs(scrollY - lastScrollY) < 15) {
+        ticking = false;
+        return;
+      }
+
+      if (scrollY > lastScrollY && scrollY > 80) {
+        // Scrolling down -> hide
+        setHideNav(true);
+      } else {
+        // Scrolling up -> show
+        setHideNav(false);
+      }
+
+      // Always show if scrolled to the very bottom or top of the page
+      if (window.innerHeight + scrollY >= document.documentElement.scrollHeight - 30 || scrollY < 10) {
+        setHideNav(false);
+      }
+
+      lastScrollY = scrollY > 0 ? scrollY : 0;
+      ticking = false;
+    };
+
+    const onScroll = () => {
+      if (!ticking) {
+        window.requestAnimationFrame(updateScrollDirection);
+        ticking = true;
+      }
+    };
+
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
 
   // Auth monitoring
   useEffect(() => {
@@ -723,13 +780,77 @@ function App() {
 
               {/* Centered pill navigation */}
               <nav className="nav-pill">
-                <button className={`nav-pill-item ${activeTab === 'dashboard' ? 'active' : ''}`} onClick={() => setActiveTab('dashboard')}>Dashboard</button>
-                <button className={`nav-pill-item ${activeTab === 'cashflow' ? 'active' : ''}`} onClick={() => setActiveTab('cashflow')}>Cash Flow</button>
-                <button className={`nav-pill-item ${activeTab === 'savings' ? 'active' : ''}`} onClick={() => setActiveTab('savings')}>Savings</button>
-                <button className={`nav-pill-item ${activeTab === 'investments' ? 'active' : ''}`} onClick={() => setActiveTab('investments')}>Invest</button>
-                <button className={`nav-pill-item ${activeTab === 'projection' ? 'active' : ''}`} onClick={() => setActiveTab('projection')}>Wealth</button>
-                <button className={`nav-pill-item ${activeTab === 'reports' ? 'active' : ''}`} onClick={() => setActiveTab('reports')}>Reports</button>
-                <button className={`nav-pill-item ${activeTab === 'insights' ? 'active' : ''}`} onClick={() => setActiveTab('insights')}>Insights</button>
+                <button
+                  className={`nav-pill-item ${activeTab === 'dashboard' ? 'active' : ''}`}
+                  onClick={() => navigateTo('dashboard')}
+                >
+                  {activeTab === 'dashboard' && (
+                    <motion.div
+                      layoutId="activeTabBg"
+                      className="nav-pill-active-bg"
+                      transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+                    />
+                  )}
+                  <span>Dashboard</span>
+                </button>
+
+                <button
+                  className={`nav-pill-item ${activeTab === 'cashflow' ? 'active' : ''}`}
+                  onClick={() => navigateTo('cashflow')}
+                >
+                  {activeTab === 'cashflow' && (
+                    <motion.div
+                      layoutId="activeTabBg"
+                      className="nav-pill-active-bg"
+                      transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+                    />
+                  )}
+                  <span>Cash Flow</span>
+                </button>
+
+                <button
+                  className={`nav-pill-item ${activeTab === 'savings' ? 'active' : ''}`}
+                  onClick={() => navigateTo('savings')}
+                >
+                  {activeTab === 'savings' && (
+                    <motion.div
+                      layoutId="activeTabBg"
+                      className="nav-pill-active-bg"
+                      transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+                    />
+                  )}
+                  <span>Savings</span>
+                </button>
+
+                <button
+                  className={`nav-pill-item ${activeTab === 'investments' ? 'active' : ''}`}
+                  onClick={() => navigateTo('investments')}
+                >
+                  {activeTab === 'investments' && (
+                    <motion.div
+                      layoutId="activeTabBg"
+                      className="nav-pill-active-bg"
+                      transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+                    />
+                  )}
+                  <span>Invest</span>
+                </button>
+
+                <button
+                  className={`nav-pill-item ${isMoreActive ? 'active' : ''}`}
+                  onClick={toggleMoreHub}
+                >
+                  {isMoreActive && (
+                    <motion.div
+                      layoutId="activeTabBg"
+                      className="nav-pill-active-bg"
+                      transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+                    />
+                  )}
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    More <Grid size={12} />
+                  </span>
+                </button>
               </nav>
 
               {/* User profile chip & action icons */}
@@ -770,13 +891,6 @@ function App() {
                     {profileName.split(' ')[0]}
                   </span>
                 </div>
-
-                <button className="icon-btn" onClick={handleReset} title="Reset Data">
-                  <RotateCcw size={14} />
-                </button>
-                <button className="icon-btn" onClick={handleSignOut} title="Sign Out">
-                  <LogOut size={14} />
-                </button>
               </div>
             </div>
           </header>
@@ -862,15 +976,183 @@ function App() {
           </main>
 
           {/* Floating bottom pill navigation */}
-          <nav className="mobile-pill-nav">
-            <button className={`mobile-pill-item ${activeTab === 'dashboard' ? 'active' : ''}`} onClick={() => setActiveTab('dashboard')} title="Dashboard"><LayoutDashboard size={18} /></button>
-            <button className={`mobile-pill-item ${activeTab === 'cashflow' ? 'active' : ''}`} onClick={() => setActiveTab('cashflow')} title="Cash Flow"><ArrowLeftRight size={18} /></button>
-            <button className={`mobile-pill-item ${activeTab === 'savings' ? 'active' : ''}`} onClick={() => setActiveTab('savings')} title="Savings"><Target size={18} /></button>
-            <button className={`mobile-pill-item ${activeTab === 'investments' ? 'active' : ''}`} onClick={() => setActiveTab('investments')} title="Invest"><TrendingUp size={18} /></button>
-            <button className={`mobile-pill-item ${activeTab === 'projection' ? 'active' : ''}`} onClick={() => setActiveTab('projection')} title="Wealth"><LineChart size={18} /></button>
-            <button className={`mobile-pill-item ${activeTab === 'reports' ? 'active' : ''}`} onClick={() => setActiveTab('reports')} title="Reports"><PieChart size={18} /></button>
-            <button className={`mobile-pill-item ${activeTab === 'insights' ? 'active' : ''}`} onClick={() => setActiveTab('insights')} title="Insights"><Lightbulb size={18} /></button>
-          </nav>
+          <motion.nav
+            className="mobile-pill-nav"
+            animate={{
+              y: hideNav ? 100 : 0,
+              x: '-50%'
+            }}
+            transition={{
+              type: 'spring',
+              stiffness: 260,
+              damping: 26
+            }}
+          >
+            <button
+              className={`mobile-pill-item ${activeTab === 'dashboard' ? 'active' : ''}`}
+              onClick={() => navigateTo('dashboard')}
+              title="Dashboard"
+            >
+              {activeTab === 'dashboard' && (
+                <motion.div
+                  layoutId="activeMobileTabBg"
+                  className="mobile-pill-active-bg"
+                  transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+                />
+              )}
+              <LayoutDashboard size={18} />
+            </button>
+
+            <button
+              className={`mobile-pill-item ${activeTab === 'cashflow' ? 'active' : ''}`}
+              onClick={() => navigateTo('cashflow')}
+              title="Cash Flow"
+            >
+              {activeTab === 'cashflow' && (
+                <motion.div
+                  layoutId="activeMobileTabBg"
+                  className="mobile-pill-active-bg"
+                  transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+                />
+              )}
+              <ArrowLeftRight size={18} />
+            </button>
+
+            <button
+              className={`mobile-pill-item ${activeTab === 'savings' ? 'active' : ''}`}
+              onClick={() => navigateTo('savings')}
+              title="Savings"
+            >
+              {activeTab === 'savings' && (
+                <motion.div
+                  layoutId="activeMobileTabBg"
+                  className="mobile-pill-active-bg"
+                  transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+                />
+              )}
+              <Target size={18} />
+            </button>
+
+            <button
+              className={`mobile-pill-item ${activeTab === 'investments' ? 'active' : ''}`}
+              onClick={() => navigateTo('investments')}
+              title="Invest"
+            >
+              {activeTab === 'investments' && (
+                <motion.div
+                  layoutId="activeMobileTabBg"
+                  className="mobile-pill-active-bg"
+                  transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+                />
+              )}
+              <TrendingUp size={18} />
+            </button>
+
+            <button
+              className={`mobile-pill-item ${isMoreActive ? 'active' : ''}`}
+              onClick={toggleMoreHub}
+              title="More Options"
+            >
+              {isMoreActive && (
+                <motion.div
+                  layoutId="activeMobileTabBg"
+                  className="mobile-pill-active-bg"
+                  transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+                />
+              )}
+              <Grid size={18} />
+            </button>
+          </motion.nav>
+
+          {/* Glassmorphic More Hub Overlay */}
+          <AnimatePresence>
+            {showMoreHub && (
+              <>
+                {/* Backdrop */}
+                <motion.div
+                  className="hub-backdrop"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  onClick={() => setShowMoreHub(false)}
+                />
+
+                {/* Sheet */}
+                <motion.div
+                  className="hub-sheet"
+                  initial={{ y: '100%', x: '-50%' }}
+                  animate={{ y: 0, x: '-50%' }}
+                  exit={{ y: '100%', x: '-50%' }}
+                  transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+                >
+                  <div className="hub-sheet-drag-handle" />
+                  
+                  <div className="hub-sheet-header">
+                    <h3 className="hub-sheet-title">More Hub</h3>
+                    <button className="hub-sheet-close" onClick={() => setShowMoreHub(false)}>
+                      <X size={18} />
+                    </button>
+                  </div>
+
+                  <div className="hub-sheet-content">
+                    <div className="hub-grid">
+                      <button
+                        className={`hub-card ${activeTab === 'projection' ? 'active' : ''}`}
+                        onClick={() => navigateTo('projection')}
+                      >
+                        <div className="hub-card-icon-wrapper">
+                          <LineChart size={20} />
+                        </div>
+                        <div className="hub-card-text">
+                          <div className="hub-card-name">Wealth Projection</div>
+                          <div className="hub-card-desc">Simulate compound interest and future wealth growth.</div>
+                        </div>
+                      </button>
+
+                      <button
+                        className={`hub-card ${activeTab === 'reports' ? 'active' : ''}`}
+                        onClick={() => navigateTo('reports')}
+                      >
+                        <div className="hub-card-icon-wrapper">
+                          <PieChart size={20} />
+                        </div>
+                        <div className="hub-card-text">
+                          <div className="hub-card-name">Reports & Charts</div>
+                          <div className="hub-card-desc">Visual breakdown of transactions and income allocation.</div>
+                        </div>
+                      </button>
+
+                      <button
+                        className={`hub-card ${activeTab === 'insights' ? 'active' : ''}`}
+                        onClick={() => navigateTo('insights')}
+                      >
+                        <div className="hub-card-icon-wrapper">
+                          <Lightbulb size={20} />
+                        </div>
+                        <div className="hub-card-text">
+                          <div className="hub-card-name">Financial Insights</div>
+                          <div className="hub-card-desc">Automated rules of thumb and customized optimization tips.</div>
+                        </div>
+                      </button>
+                    </div>
+
+                    <hr className="hub-divider" />
+
+                    <div className="hub-actions-grid">
+                      <button className="hub-action-btn danger" onClick={() => { setShowMoreHub(false); handleReset(); }}>
+                        <RotateCcw size={14} />
+                        <span>Reset Application</span>
+                      </button>
+                      <button className="hub-action-btn" onClick={() => { setShowMoreHub(false); handleSignOut(); }}>
+                        <LogOut size={14} />
+                        <span>Sign Out</span>
+                      </button>
+                    </div>
+                  </div>
+                </motion.div>
+              </>
+            )}
+          </AnimatePresence>
 
         </div>
       )}
