@@ -120,6 +120,26 @@ function App() {
   const [showMoreHub, setShowMoreHub] = useState(false);
   const [hideNav, setHideNav] = useState(false);
 
+  // PWA Installation Prompts States
+  const [showIOSPrompt, setShowIOSPrompt] = useState(false);
+  const [showAndroidPrompt, setShowAndroidPrompt] = useState(false);
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+
+  const dismissPrompt = () => {
+    localStorage.setItem('lumen-pwa-prompt-dismissed', 'true');
+    setShowIOSPrompt(false);
+    setShowAndroidPrompt(false);
+  };
+
+  const handleAndroidInstall = async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    console.log(`User installation outcome: ${outcome}`);
+    setDeferredPrompt(null);
+    setShowAndroidPrompt(false);
+  };
+
   const isSecondaryTabActive = ['projection', 'reports', 'insights'].includes(activeTab);
   const isMoreActive = isSecondaryTabActive || showMoreHub;
 
@@ -171,6 +191,39 @@ function App() {
 
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
+  // PWA installation prompt triggers
+  useEffect(() => {
+    const isDismissed = localStorage.getItem('lumen-pwa-prompt-dismissed') === 'true';
+    if (isDismissed) return;
+
+    const userAgent = window.navigator.userAgent.toLowerCase();
+    const isIOS = /iphone|ipad|ipod/.test(userAgent);
+    const isStandalone = 
+      (window.navigator as any).standalone || 
+      window.matchMedia('(display-mode: standalone)').matches;
+
+    if (isIOS && !isStandalone) {
+      // Delay iOS display to look natural after onboarding/login
+      const timer = setTimeout(() => {
+        setShowIOSPrompt(true);
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+
+    const handleBeforeInstall = (e: Event) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      if (!isStandalone) {
+        setShowAndroidPrompt(true);
+      }
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstall);
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
+    };
   }, []);
 
   // Auth monitoring
@@ -1152,6 +1205,88 @@ function App() {
                   </div>
                 </motion.div>
               </>
+            )}
+          </AnimatePresence>
+
+          {/* PWA Install Prompts */}
+          <AnimatePresence>
+            {showIOSPrompt && (
+              <motion.div
+                className="pwa-prompt"
+                initial={{ opacity: 0, y: 50, x: '-50%' }}
+                animate={{ opacity: 1, y: 0, x: '-50%' }}
+                exit={{ opacity: 0, y: 50, x: '-50%' }}
+                transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+              >
+                <div className="pwa-prompt-header">
+                  <div className="pwa-prompt-logo-title">
+                    <div className="pwa-prompt-logo">
+                      <svg width="16" height="16" viewBox="0 0 48 46" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path fill="currentColor" d="M25.946 44.938c-.664.845-2.021.375-2.021-.698V33.937a2.26 2.26 0 0 0-2.262-2.262H10.287c-.92 0-1.456-1.04-.92-1.788l7.48-10.471c1.07-1.497 0-3.578-1.842-3.578H1.237c-.92 0-1.456-1.04-.92-1.788L10.013.474c.214-.297.556-.474.92-.474h28.894c.92 0 1.456 1.04.92 1.788l-7.48 10.471c-1.07 1.498 0 3.579 1.842 3.579h11.377c.943 0 1.473 1.088.89 1.83L25.947 44.94z" />
+                      </svg>
+                    </div>
+                    <span className="pwa-prompt-title">Install Lumen</span>
+                  </div>
+                  <button className="pwa-prompt-close" onClick={dismissPrompt} aria-label="Dismiss">
+                    <X size={14} />
+                  </button>
+                </div>
+                <div className="pwa-prompt-body">
+                  Install Lumen on your iPhone for a fast, full-screen native mobile experience.
+                </div>
+                <div className="pwa-prompt-steps">
+                  <div className="pwa-prompt-step">
+                    <div className="pwa-prompt-step-icon">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
+                        <polyline points="16 6 12 2 8 6" />
+                        <line x1="12" y1="2" x2="12" y2="15" />
+                      </svg>
+                    </div>
+                    <span>1. Tap the Share button in Safari</span>
+                  </div>
+                  <div className="pwa-prompt-step">
+                    <div className="pwa-prompt-step-icon">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                        <line x1="12" y1="8" x2="12" y2="16" />
+                        <line x1="8" y1="12" x2="16" y2="12" />
+                      </svg>
+                    </div>
+                    <span>2. Scroll down and select "Add to Home Screen"</span>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
+            {showAndroidPrompt && (
+              <motion.div
+                className="pwa-prompt"
+                initial={{ opacity: 0, y: 50, x: '-50%' }}
+                animate={{ opacity: 1, y: 0, x: '-50%' }}
+                exit={{ opacity: 0, y: 50, x: '-50%' }}
+                transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+              >
+                <div className="pwa-prompt-header">
+                  <div className="pwa-prompt-logo-title">
+                    <div className="pwa-prompt-logo">
+                      <svg width="16" height="16" viewBox="0 0 48 46" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path fill="currentColor" d="M25.946 44.938c-.664.845-2.021.375-2.021-.698V33.937a2.26 2.26 0 0 0-2.262-2.262H10.287c-.92 0-1.456-1.04-.92-1.788l7.48-10.471c1.07-1.497 0-3.578-1.842-3.578H1.237c-.92 0-1.456-1.04-.92-1.788L10.013.474c.214-.297.556-.474.92-.474h28.894c.92 0 1.456 1.04.92 1.788l-7.48 10.471c-1.07 1.498 0 3.579 1.842 3.579h11.377c.943 0 1.473 1.088.89 1.83L25.947 44.94z" />
+                      </svg>
+                    </div>
+                    <span className="pwa-prompt-title">Install Lumen</span>
+                  </div>
+                  <button className="pwa-prompt-close" onClick={dismissPrompt} aria-label="Dismiss">
+                    <X size={14} />
+                  </button>
+                </div>
+                <div className="pwa-prompt-body">
+                  Add Lumen to your home screen for quick, offline access and a native feel.
+                </div>
+                <button className="pwa-prompt-btn" onClick={handleAndroidInstall}>
+                  Install App
+                </button>
+              </motion.div>
             )}
           </AnimatePresence>
 
