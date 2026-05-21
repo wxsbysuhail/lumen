@@ -2,7 +2,7 @@ import sharp from 'sharp';
 import fs from 'fs';
 import path from 'path';
 
-const sourceImgPath = 'C:/Users/suhail.wohedally/.gemini/antigravity/brain/c051df51-20ab-4243-99af-b0447455bdce/media__1779365463747.jpg';
+const sourceImgPath = 'C:/Users/suhail.wohedally/.gemini/antigravity/brain/c051df51-20ab-4243-99af-b0447455bdce/lumen_flat_logo_concept_1779365832339.png';
 const destConceptPath = path.resolve('public/logo-concept.png');
 const publicDir = path.resolve('public');
 
