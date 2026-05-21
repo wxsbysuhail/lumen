@@ -1074,6 +1074,7 @@ function App() {
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
+                  transition={{ duration: 0.25, ease: 'linear' }}
                   onClick={() => setShowMoreHub(false)}
                 />
 
@@ -1083,7 +1084,7 @@ function App() {
                   initial={{ y: '100%', x: '-50%' }}
                   animate={{ y: 0, x: '-50%' }}
                   exit={{ y: '100%', x: '-50%' }}
-                  transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+                  transition={{ type: 'tween', ease: [0.16, 1, 0.3, 1], duration: 0.38 }}
                 >
                   <div className="hub-sheet-drag-handle" />
                   

@@ -528,9 +528,7 @@ h1, h2, h3, h4, h5, h6 {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.12);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  background: rgba(0, 0, 0, 0.4);
   z-index: 290;
 }
 
@@ -540,15 +538,14 @@ h1, h2, h3, h4, h5, h6 {
   left: 50%;
   width: 100%;
   max-width: 580px;
-  background: rgba(250, 250, 247, 0.82);
-  backdrop-filter: blur(32px);
-  -webkit-backdrop-filter: blur(32px);
+  background: var(--card-bg);
   border: 1px solid rgba(10, 10, 10, 0.08);
   border-top-left-radius: 24px;
   border-top-right-radius: 24px;
   padding: 16px 24px 24px 24px;
   z-index: 300;
   box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.08), 0 8px 32px rgba(0, 0, 0, 0.04);
+  will-change: transform;
 }
 
 @media (min-width: 640px) {
