@@ -226,14 +226,17 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
                       {av.recommended && (
                         <span style={{
                           position: 'absolute',
-                          top: '-8px',
-                          right: '-8px',
-                          fontSize: '0.55rem',
+                          top: '-6px',
+                          right: '-6px',
+                          fontSize: '9px',
                           background: 'var(--ink-color)',
-                          color: 'var(--page-bg)',
-                          padding: '1px 4px',
+                          color: '#ffffff',
+                          padding: '2px 5px',
                           borderRadius: '4px',
                           fontWeight: 700,
+                          lineHeight: 1,
+                          whiteSpace: 'nowrap',
+                          boxShadow: '0 1px 3px rgba(0,0,0,0.15)',
                         }}>
                           Rec
                         </span>
