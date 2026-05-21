@@ -124,14 +124,14 @@ export const SavingsTracker: React.FC<SavingsTrackerProps> = ({
       transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
       className="flex flex-col gap-8"
     >
-      <div className="flex justify-between align-center">
-        <div className="flex flex-col gap-2">
-          <h1 className="serif-title" style={{ fontSize: '2.5rem', fontWeight: 400, fontStyle: 'italic' }}>Savings Targets</h1>
+      <div className="flex justify-between align-start gap-4">
+        <div className="flex flex-col gap-2" style={{ flex: 1 }}>
+          <h1 className="serif-title" style={{ fontSize: '2.5rem', fontWeight: 400, fontStyle: 'italic', lineHeight: 1.1, marginBottom: '4px' }}>Savings Targets</h1>
           <p style={{ color: 'var(--ink-muted)' }}>
             Allocate funds to separate goal buckets. Monitor progress rings and timelines.
           </p>
         </div>
-        <button className="btn btn-primary" onClick={() => setShowAddForm(true)}>
+        <button className="btn btn-primary" style={{ flexShrink: 0, marginTop: '4px', whiteSpace: 'nowrap' }} onClick={() => setShowAddForm(true)}>
           <Plus size={16} /> New Bucket
         </button>
       </div>
