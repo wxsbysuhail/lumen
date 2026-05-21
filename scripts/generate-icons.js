@@ -2,7 +2,7 @@ import sharp from 'sharp';
 import fs from 'fs';
 import path from 'path';
 
-const sourceImgPath = 'C:/Users/suhail.wohedally/.gemini/antigravity/brain/c051df51-20ab-4243-99af-b0447455bdce/lumen_white_l_icon_1779364308041.png';
+const sourceImgPath = 'C:/Users/suhail.wohedally/.gemini/antigravity/brain/c051df51-20ab-4243-99af-b0447455bdce/media__1779365463747.jpg';
 const destConceptPath = path.resolve('public/logo-concept.png');
 const publicDir = path.resolve('public');
 
@@ -10,11 +10,16 @@ async function generate() {
   console.log(`Copying source icon from ${sourceImgPath} to ${destConceptPath}...`);
   fs.copyFileSync(sourceImgPath, destConceptPath);
 
-  console.log('Trimming the L emblem to remove background margins...');
-  // Trim removes pixels of the same color as the corners (which is white)
+  console.log('Trimming the L emblem with a threshold to isolate the black & gold logo...');
+  // A threshold of 40 will ignore the white background and off-white squircle card,
+  // trimming down precisely to the bounding box of the black 'L' and its gold glow.
   const trimmedBuffer = await sharp(destConceptPath)
-    .trim()
+    .trim({ threshold: 40 })
     .toBuffer();
+
+  // Get info of the trimmed image to ensure it succeeded
+  const trimmedMetadata = await sharp(trimmedBuffer).metadata();
+  console.log(`- Isolated emblem dimensions: ${trimmedMetadata.width}x${trimmedMetadata.height}`);
 
   console.log('Generating PWA icons with perfect sizing and white background...');
 
@@ -27,8 +32,8 @@ async function generate() {
   ];
 
   for (const target of standardTargets) {
-    // For standard icons, let the emblem occupy 65% of the dimensions
-    const innerSize = Math.max(1, Math.round(target.size * 0.65));
+    // For standard icons, let the emblem occupy 60% of the dimensions for balanced spacing
+    const innerSize = Math.max(1, Math.round(target.size * 0.60));
     const padding = Math.max(0, Math.round((target.size - innerSize) / 2));
 
     await sharp(trimmedBuffer)
@@ -54,9 +59,9 @@ async function generate() {
   ];
 
   for (const target of maskableTargets) {
-    // For maskable icons, let the emblem occupy 50% of the dimensions
+    // For maskable icons, let the emblem occupy 48% of the dimensions
     // to guarantee it fits safely within the 60% circular safe zone on mobile launchers
-    const innerSize = Math.max(1, Math.round(target.size * 0.50));
+    const innerSize = Math.max(1, Math.round(target.size * 0.48));
     const padding = Math.max(0, Math.round((target.size - innerSize) / 2));
 
     await sharp(trimmedBuffer)
