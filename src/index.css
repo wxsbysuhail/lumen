@@ -726,6 +726,19 @@ h1, h2, h3, h4, h5, h6 {
   border-color: rgba(232, 93, 93, 0.25);
 }
 
+.hub-action-btn.primary {
+  grid-column: 1 / -1;
+  background: var(--ink-color);
+  color: var(--bg-color);
+  border-color: var(--ink-color);
+}
+
+.hub-action-btn.primary:hover {
+  background: rgba(10, 10, 10, 0.85);
+  color: var(--bg-color);
+  border-color: rgba(10, 10, 10, 0.85);
+}
+
 .text-gain { color: var(--emerald-gains); }
 .text-loss { color: var(--coral-losses); }
 

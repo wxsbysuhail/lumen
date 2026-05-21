@@ -23,6 +23,7 @@ import {
   LogOut,
   Grid,
   X,
+  Download,
 } from 'lucide-react';
 
 interface Transaction {
@@ -138,6 +139,21 @@ function App() {
     console.log(`User installation outcome: ${outcome}`);
     setDeferredPrompt(null);
     setShowAndroidPrompt(false);
+  };
+
+  const handleTriggerInstallFromHub = () => {
+    setShowMoreHub(false);
+    
+    const userAgent = window.navigator.userAgent.toLowerCase();
+    const isIOS = /iphone|ipad|ipod/.test(userAgent);
+    
+    if (isIOS) {
+      setShowIOSPrompt(true);
+    } else if (deferredPrompt) {
+      setShowAndroidPrompt(true);
+    } else {
+      alert("To install Lumen: \n\n• On iOS Safari: Tap the Share button (bottom menu bar) and select 'Add to Home Screen'.\n• On Android Chrome / Desktop: Tap the browser menu (three dots) and select 'Add to Home Screen' or 'Install App'.");
+    }
   };
 
   const isSecondaryTabActive = ['projection', 'reports', 'insights'].includes(activeTab);
@@ -1193,6 +1209,12 @@ function App() {
                     <hr className="hub-divider" />
 
                     <div className="hub-actions-grid">
+                      {!((window.navigator as any).standalone || window.matchMedia('(display-mode: standalone)').matches) && (
+                        <button className="hub-action-btn primary" onClick={handleTriggerInstallFromHub}>
+                          <Download size={14} />
+                          <span>Install App</span>
+                        </button>
+                      )}
                       <button className="hub-action-btn danger" onClick={() => { setShowMoreHub(false); handleReset(); }}>
                         <RotateCcw size={14} />
                         <span>Reset Application</span>
