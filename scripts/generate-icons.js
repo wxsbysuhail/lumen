@@ -1,51 +1,80 @@
 import sharp from 'sharp';
+import fs from 'fs';
 import path from 'path';
 
-const sourceImgPath = path.resolve('public/logo-concept.png');
+const sourceImgPath = 'C:/Users/suhail.wohedally/.gemini/antigravity/brain/c051df51-20ab-4243-99af-b0447455bdce/lumen_white_l_icon_1779364308041.png';
+const destConceptPath = path.resolve('public/logo-concept.png');
 const publicDir = path.resolve('public');
 
 async function generate() {
-  console.log(`Generating PWA icons from ${sourceImgPath}...`);
-  
-  // Standard PWA size icons and favicon
-  const targets = [
+  console.log(`Copying source icon from ${sourceImgPath} to ${destConceptPath}...`);
+  fs.copyFileSync(sourceImgPath, destConceptPath);
+
+  console.log('Trimming the L emblem to remove background margins...');
+  // Trim removes pixels of the same color as the corners (which is white)
+  const trimmedBuffer = await sharp(destConceptPath)
+    .trim()
+    .toBuffer();
+
+  console.log('Generating PWA icons with perfect sizing and white background...');
+
+  // Standard target icons
+  const standardTargets = [
     { size: 32, file: 'favicon.png' },
     { size: 180, file: 'apple-touch-icon.png' },
     { size: 192, file: 'icon-192.png' },
     { size: 512, file: 'icon-512.png' }
   ];
 
-  for (const target of targets) {
-    await sharp(sourceImgPath)
-      .resize(target.size, target.size)
-      .png()
-      .toFile(path.join(publicDir, target.file));
-    
-    console.log(`- Created ${target.file} (${target.size}x${target.size})`);
-  }
+  for (const target of standardTargets) {
+    // For standard icons, let the emblem occupy 65% of the dimensions
+    const innerSize = Math.max(1, Math.round(target.size * 0.65));
+    const padding = Math.max(0, Math.round((target.size - innerSize) / 2));
 
-  // Maskable icons (requires inner padding of about 10-15% to prevent clipping on some devices)
-  const maskableSizes = [192, 512];
-  for (const size of maskableSizes) {
-    const maskableName = `icon-${size}-maskable.png`;
-    const innerSize = Math.round(size * 0.7); // 70% size, leaving 15% padding on all sides
-    const padding = Math.round((size - innerSize) / 2);
-    
-    await sharp(sourceImgPath)
-      .resize(innerSize, innerSize)
+    await sharp(trimmedBuffer)
+      .resize(innerSize, innerSize, { fit: 'inside' })
       .extend({
         top: padding,
         bottom: padding,
         left: padding,
         right: padding,
-        background: { r: 250, g: 250, b: 247, alpha: 1 } // matches #FAFAF7 (var(--bg-color))
+        background: { r: 255, g: 255, b: 255, alpha: 1 } // Pure white
       })
+      .resize(target.size, target.size) // Make sure dimensions are exact
       .png()
-      .toFile(path.join(publicDir, maskableName));
-      
-    console.log(`- Created ${maskableName} (${size}x${size}, padded)`);
+      .toFile(path.join(publicDir, target.file));
+
+    console.log(`- Created ${target.file} (${target.size}x${target.size})`);
   }
-  
+
+  // Maskable target icons
+  const maskableTargets = [
+    { size: 192, file: 'icon-192-maskable.png' },
+    { size: 512, file: 'icon-512-maskable.png' }
+  ];
+
+  for (const target of maskableTargets) {
+    // For maskable icons, let the emblem occupy 50% of the dimensions
+    // to guarantee it fits safely within the 60% circular safe zone on mobile launchers
+    const innerSize = Math.max(1, Math.round(target.size * 0.50));
+    const padding = Math.max(0, Math.round((target.size - innerSize) / 2));
+
+    await sharp(trimmedBuffer)
+      .resize(innerSize, innerSize, { fit: 'inside' })
+      .extend({
+        top: padding,
+        bottom: padding,
+        left: padding,
+        right: padding,
+        background: { r: 255, g: 255, b: 255, alpha: 1 } // Pure white
+      })
+      .resize(target.size, target.size) // Make sure dimensions are exact
+      .png()
+      .toFile(path.join(publicDir, target.file));
+
+    console.log(`- Created ${target.file} (${target.size}x${target.size}, maskable)`);
+  }
+
   console.log('All icons generated successfully!');
 }
 
