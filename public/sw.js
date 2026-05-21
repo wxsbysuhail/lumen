@@ -2,7 +2,7 @@ const CACHE_NAME = 'lumen-cache-v1';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
-  '/favicon.svg',
+  '/favicon.png',
   '/icons.svg',
   '/manifest.json',
   '/apple-touch-icon.png',
