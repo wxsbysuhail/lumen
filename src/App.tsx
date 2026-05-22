@@ -49,6 +49,7 @@ interface SavingsBucket {
   target: number;
   current: number;
   monthlyContribution: number;
+  priority?: 'high' | 'medium' | 'low';
 }
 
 interface Holding {
@@ -275,6 +276,155 @@ function App() {
     return () => subscription.unsubscribe();
   }, []);
 
+  const checkAndApplyRecurringIncomes = async (
+    profile: any,
+    recurringItems: any[],
+    userId: string
+  ) => {
+    // 1. Calculate latest occurred 26th
+    const now = new Date();
+    let targetYear = now.getFullYear();
+    let targetMonth = now.getMonth(); // 0-indexed
+    if (now.getDate() < 26) {
+      targetMonth -= 1;
+      if (targetMonth < 0) {
+        targetMonth = 11;
+        targetYear -= 1;
+      }
+    }
+    const latest26thStr = `${targetYear}-${String(targetMonth + 1).padStart(2, '0')}`;
+    const lastApplied = profile.last_recurring_applied_month;
+
+    if (!lastApplied) {
+      // First time initialization: set to latest26thStr without applying to avoid double-charging start balance
+      try {
+        await supabase
+          .from('profiles')
+          .update({ last_recurring_applied_month: latest26thStr })
+          .eq('id', userId);
+        console.log(`Initialized last_recurring_applied_month to ${latest26thStr}`);
+      } catch (err) {
+        console.error('Error initializing recurring applied month:', err);
+      }
+      return;
+    }
+
+    if (lastApplied >= latest26thStr) {
+      // Already fully applied for the latest monthly cycle
+      return;
+    }
+
+    // 2. Find salary and transport allowance in active recurring items
+    const salaryItem = recurringItems.find(item => 
+      item.type === 'income' && /base|salary/i.test(item.description)
+    );
+    const transportItem = recurringItems.find(item => 
+      item.type === 'income' && /transport/i.test(item.description)
+    );
+
+    const salaryAmt = salaryItem ? Number(salaryItem.amount) : 0;
+    const transportAmt = transportItem ? Number(transportItem.amount) : 0;
+    const totalToAddPerMonth = salaryAmt + transportAmt;
+
+    if (totalToAddPerMonth <= 0) return;
+
+    // 3. Find missing months (if user hasn't logged in for a while)
+    const getNextMonthStr = (monthStr: string) => {
+      const [year, month] = monthStr.split('-').map(Number);
+      let nextMonth = month + 1;
+      let nextYear = year;
+      if (nextMonth > 12) {
+        nextMonth = 1;
+        nextYear += 1;
+      }
+      return `${nextYear}-${String(nextMonth).padStart(2, '0')}`;
+    };
+
+    let currentMonth = lastApplied;
+    const monthsToApply: string[] = [];
+    while (currentMonth < latest26thStr) {
+      currentMonth = getNextMonthStr(currentMonth);
+      monthsToApply.push(currentMonth);
+    }
+
+    if (monthsToApply.length === 0) return;
+
+    const totalTransactionsAmount = totalToAddPerMonth * monthsToApply.length;
+    const newBalance = Number(profile.current_balance) + totalTransactionsAmount;
+
+    try {
+      // Update profile balance and last applied month tracker
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({
+          current_balance: newBalance,
+          last_recurring_applied_month: latest26thStr,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', userId);
+
+      if (profileError) throw profileError;
+
+      // Create transaction logs for complete tracking integrity
+      const transactionsToAdd: any[] = [];
+      monthsToApply.forEach(month => {
+        if (salaryAmt > 0) {
+          transactionsToAdd.push({
+            user_id: userId,
+            description: salaryItem ? salaryItem.description : 'Base Salary',
+            amount: salaryAmt,
+            type: 'income',
+            category: 'income',
+            date: `${month}-26`
+          });
+        }
+        if (transportAmt > 0) {
+          transactionsToAdd.push({
+            user_id: userId,
+            description: transportItem ? transportItem.description : 'Transport Allowance',
+            amount: transportAmt,
+            type: 'income',
+            category: 'income',
+            date: `${month}-26`
+          });
+        }
+      });
+
+      if (transactionsToAdd.length > 0) {
+        const { error: txError } = await supabase
+          .from('transactions')
+          .insert(transactionsToAdd);
+
+        if (txError) throw txError;
+      }
+
+      // Update React state
+      setGeneralBalance(newBalance);
+
+      // Reload transactions to reflect in ledger instantly
+      const { data: newTxData } = await supabase
+        .from('transactions')
+        .select('*')
+        .eq('user_id', userId)
+        .order('date', { ascending: false });
+
+      if (newTxData) {
+        setTransactions(newTxData.map((tx: any) => ({
+          id: tx.id,
+          description: tx.description,
+          amount: Number(tx.amount),
+          type: tx.type,
+          category: tx.category,
+          date: tx.date,
+        })));
+      }
+
+      console.log(`Successfully applied monthly recurring updates for: ${monthsToApply.join(', ')}`);
+    } catch (err) {
+      console.error('Error applying missing recurring items:', err);
+    }
+  };
+
   const loadUserData = async (userId: string) => {
     setAuthLoading(true);
     try {
@@ -334,6 +484,7 @@ function App() {
             target: Number(b.target),
             current: Number(b.current),
             monthlyContribution: Number(b.monthly_contribution),
+            priority: b.priority as any || 'medium',
           })));
         }
 
@@ -343,6 +494,11 @@ function App() {
             shares: Number(h.shares),
             avgPrice: Number(h.avg_price),
           })));
+        }
+
+        // Apply automated monthly salary and allowance deposits on the 26th
+        if (recRes.data) {
+          await checkAndApplyRecurringIncomes(profile, recRes.data, userId);
         }
       } else {
         setIsOnboarded(false);
@@ -366,6 +522,18 @@ function App() {
 
     const userId = session.user.id;
 
+    const now = new Date();
+    let targetYear = now.getFullYear();
+    let targetMonth = now.getMonth(); // 0-indexed
+    if (now.getDate() < 26) {
+      targetMonth -= 1;
+      if (targetMonth < 0) {
+        targetMonth = 11;
+        targetYear -= 1;
+      }
+    }
+    const latest26thStr = `${targetYear}-${String(targetMonth + 1).padStart(2, '0')}`;
+
     try {
       // Save profile only — no seeded data, user fills everything from scratch
       const { error: profileError } = await supabase
@@ -378,6 +546,7 @@ function App() {
           current_balance: data.currentBalance,
           primary_goal: data.primaryGoal,
           onboarding_completed: true,
+          last_recurring_applied_month: latest26thStr,
           updated_at: new Date().toISOString()
         });
 
@@ -566,7 +735,7 @@ function App() {
     }
   };
 
-  const handleAddBucket = async (name: string, target: number, monthly: number) => {
+  const handleAddBucket = async (name: string, target: number, monthly: number, priority: 'high' | 'medium' | 'low' = 'medium') => {
     if (!session?.user) return;
     try {
       const newBucket = {
@@ -575,6 +744,7 @@ function App() {
         target,
         current: 0,
         monthly_contribution: monthly,
+        priority,
       };
 
       const { data: bucketData, error } = await supabase
@@ -589,6 +759,7 @@ function App() {
         target: Number(bucketData[0].target),
         current: Number(bucketData[0].current),
         monthlyContribution: Number(bucketData[0].monthly_contribution),
+        priority: bucketData[0].priority as any || 'medium',
       };
       setBuckets(prev => [...prev, insertedBucket]);
     } catch (err) {
@@ -596,13 +767,14 @@ function App() {
     }
   };
 
-  const handleUpdateBucket = async (id: string, name: string, target: number, monthly: number) => {
+  const handleUpdateBucket = async (id: string, name: string, target: number, monthly: number, priority: 'high' | 'medium' | 'low') => {
     if (!session?.user) return;
     try {
       const updatedData = {
         name,
         target,
         monthly_contribution: monthly,
+        priority,
       };
 
       const { error } = await supabase
@@ -611,7 +783,7 @@ function App() {
         .eq('id', id);
       if (error) throw error;
 
-      setBuckets(prev => prev.map(b => b.id === id ? { ...b, name, target, monthlyContribution: monthly } : b));
+      setBuckets(prev => prev.map(b => b.id === id ? { ...b, name, target, monthlyContribution: monthly, priority } : b));
     } catch (err) {
       console.error('Error updating bucket:', err);
     }
@@ -1016,6 +1188,8 @@ function App() {
                   key="savings"
                   buckets={buckets}
                   generalBalance={generalBalance}
+                  recurringIncomeItems={recurringIncomeItems}
+                  recurringExpenseItems={recurringExpenseItems}
                   onAddBucket={handleAddBucket}
                   onDepositToBucket={handleDepositToBucket}
                   onUpdateBucket={handleUpdateBucket}

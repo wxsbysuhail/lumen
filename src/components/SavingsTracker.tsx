@@ -8,20 +8,33 @@ interface SavingsBucket {
   target: number;
   current: number;
   monthlyContribution: number;
+  priority?: 'high' | 'medium' | 'low';
+}
+
+interface RecurringItem {
+  id: string;
+  description: string;
+  amount: number;
+  type: 'income' | 'expense';
+  category: string;
 }
 
 interface SavingsTrackerProps {
   buckets: SavingsBucket[];
   generalBalance: number;
-  onAddBucket: (name: string, target: number, monthly: number) => void;
+  recurringIncomeItems: RecurringItem[];
+  recurringExpenseItems: RecurringItem[];
+  onAddBucket: (name: string, target: number, monthly: number, priority: 'high' | 'medium' | 'low') => void;
   onDepositToBucket: (id: string, amount: number) => void;
-  onUpdateBucket: (id: string, name: string, target: number, monthly: number) => void;
+  onUpdateBucket: (id: string, name: string, target: number, monthly: number, priority: 'high' | 'medium' | 'low') => void;
   onDeleteBucket: (id: string) => void;
 }
 
 export const SavingsTracker: React.FC<SavingsTrackerProps> = ({
   buckets,
   generalBalance,
+  recurringIncomeItems,
+  recurringExpenseItems,
   onAddBucket,
   onDepositToBucket,
   onUpdateBucket,
@@ -31,6 +44,7 @@ export const SavingsTracker: React.FC<SavingsTrackerProps> = ({
   const [name, setName] = useState('');
   const [target, setTarget] = useState('');
   const [monthly, setMonthly] = useState('');
+  const [priority, setPriority] = useState<'high' | 'medium' | 'low'>('medium');
 
   const [depositBucketId, setDepositBucketId] = useState<string | null>(null);
   const [depositAmount, setDepositAmount] = useState('');
@@ -41,7 +55,31 @@ export const SavingsTracker: React.FC<SavingsTrackerProps> = ({
   const [editName, setEditName] = useState('');
   const [editTarget, setEditTarget] = useState('');
   const [editMonthly, setEditMonthly] = useState('');
+  const [editPriority, setEditPriority] = useState<'high' | 'medium' | 'low'>('medium');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  // Auto-Allocation Calculator Baseline Logic
+  const salaryItem = recurringIncomeItems.find(item => 
+    /base|salary/i.test(item.description)
+  );
+  const leaseItem = recurringExpenseItems.find(item => 
+    /lease/i.test(item.description)
+  );
+  const baseSalary = salaryItem ? salaryItem.amount : 30000;
+  const leaseExpense = leaseItem ? leaseItem.amount : 10000;
+  
+  const coreDisposable = Math.max(0, baseSalary - leaseExpense);
+
+  const getOtherBucketsContributionSum = (excludeId?: string) => {
+    return buckets
+      .filter(b => b.id !== excludeId)
+      .reduce((sum, b) => sum + b.monthlyContribution, 0);
+  };
+
+  const getSuggestedMax = (p: 'high' | 'medium' | 'low', remaining: number) => {
+    const pct = p === 'high' ? 0.7 : p === 'medium' ? 0.35 : 0.15;
+    return Math.round(remaining * pct);
+  };
 
   // Helper to format currency user input with commas
   const handleCurrencyChange = (value: string, setter: (val: string) => void) => {
@@ -61,10 +99,11 @@ export const SavingsTracker: React.FC<SavingsTrackerProps> = ({
     if (!name || !target) return;
     const parsedTarget = parseFloat(target.replace(/,/g, '')) || 0;
     const parsedMonthly = parseFloat(monthly.replace(/,/g, '')) || 0;
-    onAddBucket(name, parsedTarget, parsedMonthly);
+    onAddBucket(name, parsedTarget, parsedMonthly, priority);
     setName('');
     setTarget('');
     setMonthly('');
+    setPriority('medium');
     setShowAddForm(false);
   };
 
@@ -73,7 +112,7 @@ export const SavingsTracker: React.FC<SavingsTrackerProps> = ({
     if (!editingBucket || !editName || !editTarget) return;
     const parsedTarget = parseFloat(editTarget.replace(/,/g, '')) || 0;
     const parsedMonthly = parseFloat(editMonthly.replace(/,/g, '')) || 0;
-    onUpdateBucket(editingBucket.id, editName, parsedTarget, parsedMonthly);
+    onUpdateBucket(editingBucket.id, editName, parsedTarget, parsedMonthly, editPriority);
     setEditingBucket(null);
   };
 
@@ -156,11 +195,11 @@ export const SavingsTracker: React.FC<SavingsTrackerProps> = ({
           const strokeDashoffset = circumference - (pct / 100) * circumference;
           
           return (
-            <div key={bucket.id} className="card flex flex-col justify-between" style={{ minHeight: '260px' }}>
+            <div key={bucket.id} className="card flex flex-col justify-between" style={{ minHeight: '275px' }}>
               <div>
                 <div className="flex justify-between align-start" style={{ marginBottom: 'var(--space-4)' }}>
                   <div>
-                    <div className="flex align-center gap-2">
+                    <div className="flex align-center gap-2" style={{ flexWrap: 'wrap' }}>
                       <h3 style={{ fontSize: '1.2rem', fontWeight: 650, marginBottom: '2px' }}>{bucket.name}</h3>
                       <button
                         type="button"
@@ -170,6 +209,7 @@ export const SavingsTracker: React.FC<SavingsTrackerProps> = ({
                           setEditName(bucket.name);
                           setEditTarget(bucket.target.toLocaleString('en-US'));
                           setEditMonthly(bucket.monthlyContribution.toLocaleString('en-US'));
+                          setEditPriority(bucket.priority || 'medium');
                           setShowDeleteConfirm(false);
                         }}
                         title="Edit Goal"
@@ -177,9 +217,33 @@ export const SavingsTracker: React.FC<SavingsTrackerProps> = ({
                         <Edit2 size={14} />
                       </button>
                     </div>
-                    <span className="num" style={{ fontSize: '0.8rem', color: 'var(--ink-light)' }}>
-                      {calculateProjection(bucket.current, bucket.target, bucket.monthlyContribution)}
-                    </span>
+                    <div className="flex flex-col gap-1" style={{ marginTop: '2px' }}>
+                      {bucket.priority && (
+                        <div style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          padding: '2px 6px',
+                          borderRadius: '12px',
+                          fontSize: '0.7rem',
+                          fontWeight: 600,
+                          backgroundColor: bucket.priority === 'high' ? 'rgba(232, 93, 93, 0.06)' : bucket.priority === 'medium' ? 'rgba(245, 158, 11, 0.06)' : 'rgba(10, 10, 10, 0.04)',
+                          color: bucket.priority === 'high' ? 'var(--coral-losses)' : bucket.priority === 'medium' ? '#B45309' : 'var(--ink-muted)',
+                          width: 'fit-content',
+                        }}>
+                          <span style={{
+                            width: '4px',
+                            height: '4px',
+                            borderRadius: '50%',
+                            backgroundColor: bucket.priority === 'high' ? 'var(--coral-losses)' : bucket.priority === 'medium' ? '#F59E0B' : 'var(--ink-muted)',
+                          }} />
+                          {bucket.priority.toUpperCase()} PRIORITY
+                        </div>
+                      )}
+                      <span className="num" style={{ fontSize: '0.78rem', color: 'var(--ink-light)' }}>
+                        {calculateProjection(bucket.current, bucket.target, bucket.monthlyContribution)}
+                      </span>
+                    </div>
                   </div>
                   
                   {/* SVG progress ring */}
@@ -312,6 +376,140 @@ export const SavingsTracker: React.FC<SavingsTrackerProps> = ({
                   required
                 />
               </div>
+
+              <div className="input-group">
+                <label className="input-label">Goal Importance / Priority</label>
+                <div className="flex gap-2" style={{ marginTop: '4px' }}>
+                  {(['low', 'medium', 'high'] as const).map((p) => {
+                    const label = p.charAt(0).toUpperCase() + p.slice(1);
+                    const isActive = priority === p;
+                    const activeBg = p === 'high' ? 'rgba(232, 93, 93, 0.08)' : p === 'medium' ? 'rgba(245, 158, 11, 0.08)' : 'rgba(10, 10, 10, 0.04)';
+                    const activeBorder = p === 'high' ? 'var(--coral-losses)' : p === 'medium' ? 'var(--amber-warning)' : 'var(--border-color)';
+                    const activeColor = p === 'high' ? 'var(--coral-losses)' : p === 'medium' ? '#B45309' : 'var(--ink-color)';
+                    const dotColor = p === 'high' ? 'var(--coral-losses)' : p === 'medium' ? '#F59E0B' : 'var(--ink-muted)';
+                    
+                    return (
+                      <button
+                        key={p}
+                        type="button"
+                        onClick={() => setPriority(p)}
+                        style={{
+                          flex: 1,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '6px',
+                          padding: '10px 12px',
+                          borderRadius: 'var(--radius-md)',
+                          fontSize: '0.85rem',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          transition: 'all 0.2s ease',
+                          backgroundColor: isActive ? activeBg : 'rgba(10, 10, 10, 0.01)',
+                          border: `1px solid ${isActive ? activeBorder : 'var(--border-color)'}`,
+                          color: isActive ? activeColor : 'var(--ink-muted)',
+                        }}
+                      >
+                        <span style={{
+                          width: '6px',
+                          height: '6px',
+                          borderRadius: '50%',
+                          backgroundColor: dotColor,
+                        }} />
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Auto-Allocation Recommendation panel */}
+              {(() => {
+                const otherContributions = getOtherBucketsContributionSum();
+                const remaining = Math.max(0, coreDisposable - otherContributions);
+                let suggestedMax = getSuggestedMax(priority, remaining);
+
+                // Cap the suggested maximum by the target amount to avoid over-allocating beyond the goal size
+                const targetVal = parseFloat(target.replace(/,/g, '')) || 0;
+                if (targetVal > 0 && suggestedMax > targetVal) {
+                  suggestedMax = targetVal;
+                }
+
+                const currentMonthlyInput = parseFloat(monthly.replace(/,/g, '')) || 0;
+                const isExceeded = currentMonthlyInput > suggestedMax;
+                
+                return (
+                  <div className="card" style={{
+                    backgroundColor: 'rgba(10, 10, 10, 0.02)',
+                    border: '1px dashed var(--border-color)',
+                    padding: '12px var(--space-3)',
+                    borderRadius: 'var(--radius-md)',
+                    fontSize: '0.82rem',
+                    color: 'var(--ink-color)',
+                  }}>
+                    <div className="flex justify-between align-center" style={{ marginBottom: '8px' }}>
+                      <strong style={{ fontWeight: 650, color: 'var(--ink-muted)' }}>Auto-Allocation Advisor</strong>
+                      <button
+                        type="button"
+                        style={{
+                          fontSize: '0.78rem',
+                          background: 'none',
+                          border: 'none',
+                          color: 'var(--emerald-gains)',
+                          textDecoration: 'underline',
+                          cursor: suggestedMax > 0 ? 'pointer' : 'default',
+                          opacity: suggestedMax > 0 ? 1 : 0.5,
+                          padding: 0,
+                          fontWeight: 600,
+                        }}
+                        onClick={() => setMonthly(suggestedMax.toLocaleString('en-US'))}
+                        disabled={suggestedMax <= 0}
+                      >
+                        Apply Max (Rs. {suggestedMax.toLocaleString()})
+                      </button>
+                    </div>
+                    
+                    <div className="flex flex-col gap-1" style={{ color: 'var(--ink-muted)', fontSize: '0.78rem' }}>
+                      <div className="flex justify-between">
+                        <span>Baseline:</span>
+                        <span className="num">Rs. {baseSalary.toLocaleString()} (Salary) - Rs. {leaseExpense.toLocaleString()} (Lease) = Rs. {coreDisposable.toLocaleString()}</span>
+                      </div>
+                      {otherContributions > 0 && (
+                        <div className="flex justify-between">
+                          <span>Other Buckets:</span>
+                          <span className="num" style={{ color: 'var(--coral-losses)' }}>- Rs. {otherContributions.toLocaleString()} / mo</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between" style={{ borderTop: '1px solid var(--border-color)', paddingTop: '4px', marginTop: '2px', fontWeight: 600 }}>
+                        <span>Remaining Pool:</span>
+                        <span className="num" style={{ color: 'var(--ink-color)' }}>Rs. {remaining.toLocaleString()}</span>
+                      </div>
+                      <div className="flex justify-between" style={{ marginTop: '2px' }}>
+                        <span>Suggested ({priority === 'high' ? '70%' : priority === 'medium' ? '35%' : '15%'}):</span>
+                        <span className="num" style={{ fontWeight: 650, color: 'var(--emerald-gains)' }}>Rs. {suggestedMax.toLocaleString()} / mo</span>
+                      </div>
+                    </div>
+
+                    {isExceeded && (
+                      <div style={{
+                        backgroundColor: 'rgba(245, 158, 11, 0.05)',
+                        border: '1px solid rgba(245, 158, 11, 0.15)',
+                        padding: '6px 10px',
+                        borderRadius: 'var(--radius-sm)',
+                        color: '#B45309',
+                        fontSize: '0.78rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        marginTop: '10px',
+                      }}>
+                        <AlertCircle size={12} style={{ flexShrink: 0 }} />
+                        <span>Warning: Exceeds safe suggested monthly maximum.</span>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
 
               <div className="input-group">
                 <label className="input-label">Monthly Target Contribution (MUR)</label>
@@ -502,6 +700,144 @@ export const SavingsTracker: React.FC<SavingsTrackerProps> = ({
                     required
                   />
                 </div>
+
+                <div className="input-group">
+                  <label className="input-label">Goal Importance / Priority</label>
+                  <div className="flex gap-2" style={{ marginTop: '4px' }}>
+                    {(['low', 'medium', 'high'] as const).map((p) => {
+                      const label = p.charAt(0).toUpperCase() + p.slice(1);
+                      const isActive = editPriority === p;
+                      const activeBg = p === 'high' ? 'rgba(232, 93, 93, 0.08)' : p === 'medium' ? 'rgba(245, 158, 11, 0.08)' : 'rgba(10, 10, 10, 0.04)';
+                      const activeBorder = p === 'high' ? 'var(--coral-losses)' : p === 'medium' ? 'var(--amber-warning)' : 'var(--border-color)';
+                      const activeColor = p === 'high' ? 'var(--coral-losses)' : p === 'medium' ? '#B45309' : 'var(--ink-color)';
+                      const dotColor = p === 'high' ? 'var(--coral-losses)' : p === 'medium' ? '#F59E0B' : 'var(--ink-muted)';
+                      
+                      return (
+                        <button
+                          key={p}
+                          type="button"
+                          onClick={() => setEditPriority(p)}
+                          style={{
+                            flex: 1,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '6px',
+                            padding: '10px 12px',
+                            borderRadius: 'var(--radius-md)',
+                            fontSize: '0.85rem',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            transition: 'all 0.2s ease',
+                            backgroundColor: isActive ? activeBg : 'rgba(10, 10, 10, 0.01)',
+                            border: `1px solid ${isActive ? activeBorder : 'var(--border-color)'}`,
+                            color: isActive ? activeColor : 'var(--ink-muted)',
+                          }}
+                        >
+                          <span style={{
+                            width: '6px',
+                            height: '6px',
+                            borderRadius: '50%',
+                            backgroundColor: dotColor,
+                          }} />
+                          {label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Auto-Allocation Recommendation panel */}
+                {(() => {
+                  const otherContributions = getOtherBucketsContributionSum(editingBucket?.id);
+                  const remaining = Math.max(0, coreDisposable - otherContributions);
+                  let suggestedMax = getSuggestedMax(editPriority, remaining);
+
+                  // Cap the suggested maximum by the remaining target to save (target - current accumulated)
+                  const targetVal = parseFloat(editTarget.replace(/,/g, '')) || 0;
+                  const currentAccumulated = editingBucket ? editingBucket.current : 0;
+                  const remainingTarget = Math.max(0, targetVal - currentAccumulated);
+                  if (remainingTarget > 0 && suggestedMax > remainingTarget) {
+                    suggestedMax = remainingTarget;
+                  } else if (remainingTarget === 0) {
+                    suggestedMax = 0;
+                  }
+
+                  const currentMonthlyInput = parseFloat(editMonthly.replace(/,/g, '')) || 0;
+                  const isExceeded = currentMonthlyInput > suggestedMax;
+                  
+                  return (
+                    <div className="card" style={{
+                      backgroundColor: 'rgba(10, 10, 10, 0.02)',
+                      border: '1px dashed var(--border-color)',
+                      padding: '12px var(--space-3)',
+                      borderRadius: 'var(--radius-md)',
+                      fontSize: '0.82rem',
+                      color: 'var(--ink-color)',
+                    }}>
+                      <div className="flex justify-between align-center" style={{ marginBottom: '8px' }}>
+                        <strong style={{ fontWeight: 650, color: 'var(--ink-muted)' }}>Auto-Allocation Advisor</strong>
+                        <button
+                          type="button"
+                          style={{
+                            fontSize: '0.78rem',
+                            background: 'none',
+                            border: 'none',
+                            color: 'var(--emerald-gains)',
+                            textDecoration: 'underline',
+                            cursor: suggestedMax > 0 ? 'pointer' : 'default',
+                            opacity: suggestedMax > 0 ? 1 : 0.5,
+                            padding: 0,
+                            fontWeight: 600,
+                          }}
+                          onClick={() => setEditMonthly(suggestedMax.toLocaleString('en-US'))}
+                          disabled={suggestedMax <= 0}
+                        >
+                          Apply Max (Rs. {suggestedMax.toLocaleString()})
+                        </button>
+                      </div>
+                      
+                      <div className="flex flex-col gap-1" style={{ color: 'var(--ink-muted)', fontSize: '0.78rem' }}>
+                        <div className="flex justify-between">
+                          <span>Baseline:</span>
+                          <span className="num">Rs. {baseSalary.toLocaleString()} (Salary) - Rs. {leaseExpense.toLocaleString()} (Lease) = Rs. {coreDisposable.toLocaleString()}</span>
+                        </div>
+                        {otherContributions > 0 && (
+                          <div className="flex justify-between">
+                            <span>Other Buckets:</span>
+                            <span className="num" style={{ color: 'var(--coral-losses)' }}>- Rs. {otherContributions.toLocaleString()} / mo</span>
+                          </div>
+                        )}
+                        <div className="flex justify-between" style={{ borderTop: '1px solid var(--border-color)', paddingTop: '4px', marginTop: '2px', fontWeight: 600 }}>
+                          <span>Remaining Pool:</span>
+                          <span className="num" style={{ color: 'var(--ink-color)' }}>Rs. {remaining.toLocaleString()}</span>
+                        </div>
+                        <div className="flex justify-between" style={{ marginTop: '2px' }}>
+                          <span>Suggested ({editPriority === 'high' ? '70%' : editPriority === 'medium' ? '35%' : '15%'}):</span>
+                          <span className="num" style={{ fontWeight: 650, color: 'var(--emerald-gains)' }}>Rs. {suggestedMax.toLocaleString()} / mo</span>
+                        </div>
+                      </div>
+
+                      {isExceeded && (
+                        <div style={{
+                          backgroundColor: 'rgba(245, 158, 11, 0.05)',
+                          border: '1px solid rgba(245, 158, 11, 0.15)',
+                          padding: '6px 10px',
+                          borderRadius: 'var(--radius-sm)',
+                          color: '#B45309',
+                          fontSize: '0.78rem',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          marginTop: '10px',
+                        }}>
+                          <AlertCircle size={12} style={{ flexShrink: 0 }} />
+                          <span>Warning: Exceeds safe suggested monthly maximum.</span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
 
                 <div className="input-group">
                   <label className="input-label">Monthly Target Contribution (MUR)</label>
