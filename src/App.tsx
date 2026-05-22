@@ -1169,6 +1169,9 @@ function App() {
                   transactions={transactions}
                   onAddTransaction={handleAddTransaction}
                   savingsRate={currentSavingsRate}
+                  totalBucketSavings={totalBucketSavings}
+                  holdingsValue={getHoldingsValue()}
+                  onNavigate={navigateTo}
                 />
               )}
 

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, useMotionValue, useTransform, animate } from 'framer-motion';
-import { ArrowUpRight, ArrowDownRight, Plus, Calendar, TrendingUp, Edit2, ChevronDown, Search } from 'lucide-react';
+import { ArrowUpRight, ArrowDownRight, Plus, Calendar, TrendingUp, Edit2, ChevronDown, Search, Wallet, PiggyBank } from 'lucide-react';
 
 interface Transaction {
   id: string;
@@ -20,6 +20,9 @@ interface DashboardProps {
   transactions: Transaction[];
   onAddTransaction: (desc: string, amount: number, type: 'income' | 'expense', category: string) => void;
   savingsRate: number;
+  totalBucketSavings?: number;
+  holdingsValue?: number;
+  onNavigate?: (tab: 'dashboard' | 'cashflow' | 'savings' | 'investments' | 'projection' | 'reports' | 'insights') => void;
 }
 
 // Custom Motion Count-up Component
@@ -49,6 +52,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
   transactions,
   onAddTransaction,
   savingsRate,
+  totalBucketSavings = 0,
+  holdingsValue = 0,
+  onNavigate,
 }) => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [desc, setDesc] = useState('');
@@ -202,6 +208,107 @@ export const Dashboard: React.FC<DashboardProps> = ({
             <TrendingUp size={12} style={{ marginRight: '4px' }} /> Focus: {getGoalLabel(goal)}
           </span>
         </div>
+
+        {/* Horizontal Stacked Bar representing asset allocations */}
+        {balance > 0 && (
+          <div style={{
+            width: '100%',
+            maxWidth: '320px',
+            height: '6px',
+            backgroundColor: 'var(--border-color)',
+            borderRadius: '3px',
+            overflow: 'hidden',
+            display: 'flex',
+            marginTop: '16px',
+            marginBottom: '4px',
+          }}>
+            <div style={{
+              height: '100%',
+              backgroundColor: 'var(--ink-color)', // dark ink for bank cash
+              width: `${(generalBalance / balance) * 100}%`,
+              transition: 'width 0.8s cubic-bezier(0.16, 1, 0.3, 1)',
+            }} title={`Cash: ${Math.round((generalBalance / balance) * 100)}%`} />
+            <div style={{
+              height: '100%',
+              backgroundColor: 'var(--emerald-gains)', // emerald green for savings
+              width: `${(totalBucketSavings / balance) * 100}%`,
+              transition: 'width 0.8s cubic-bezier(0.16, 1, 0.3, 1)',
+            }} title={`Savings: ${Math.round((totalBucketSavings / balance) * 100)}%`} />
+            <div style={{
+              height: '100%',
+              backgroundColor: '#3B82F6', // Blue for investments
+              width: `${(holdingsValue / balance) * 100}%`,
+              transition: 'width 0.8s cubic-bezier(0.16, 1, 0.3, 1)',
+            }} title={`Investments: ${Math.round((holdingsValue / balance) * 100)}%`} />
+          </div>
+        )}
+
+        {/* Clickable glassmorphic badges */}
+        <div className="flex gap-2 justify-center flex-wrap" style={{ marginTop: '12px', width: '100%', maxWidth: '420px' }}>
+          {[
+            {
+              label: 'Cash',
+              val: generalBalance,
+              color: 'var(--ink-color)',
+              icon: <Wallet size={12} />,
+              onClick: () => {
+                setNewBalanceInput(generalBalance.toLocaleString('en-US'));
+                setShowAdjustModal(true);
+              },
+            },
+            {
+              label: 'Savings',
+              val: totalBucketSavings,
+              color: 'var(--emerald-gains)',
+              icon: <PiggyBank size={12} />,
+              onClick: () => onNavigate && onNavigate('savings'),
+            },
+            {
+              label: 'Stocks',
+              val: holdingsValue,
+              color: '#3B82F6',
+              icon: <TrendingUp size={12} />,
+              onClick: () => onNavigate && onNavigate('investments'),
+            }
+          ].map((item, idx) => (
+            <button
+              key={idx}
+              type="button"
+              onClick={item.onClick}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '6px 12px',
+                borderRadius: '20px',
+                backgroundColor: 'rgba(10, 10, 10, 0.02)',
+                border: '1px solid var(--border-color)',
+                fontSize: '0.78rem',
+                color: 'var(--ink-muted)',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = 'rgba(10, 10, 10, 0.05)';
+                e.currentTarget.style.borderColor = item.color;
+                e.currentTarget.style.transform = 'translateY(-1px)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'rgba(10, 10, 10, 0.02)';
+                e.currentTarget.style.borderColor = 'var(--border-color)';
+                e.currentTarget.style.transform = 'translateY(0)';
+              }}
+            >
+              <span style={{ color: item.color, display: 'flex', alignItems: 'center' }}>
+                {item.icon}
+              </span>
+              <span>{item.label}:</span>
+              <span className="num" style={{ fontWeight: 650, color: 'var(--ink-color)' }}>
+                Rs. {item.val.toLocaleString('en-US')}
+              </span>
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Cash Flow and Savings rate Grid */}
@@ -307,7 +414,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </div>
         ) : (
           <div className="flex flex-col" style={{ borderTop: '1px solid var(--border-color)' }}>
-            {transactions.map((tx) => (
+            {transactions.slice(0, 5).map((tx) => (
               <div key={tx.id} className="flex justify-between align-center" style={{
                 padding: 'var(--space-4) 0',
                 borderBottom: '1px solid var(--border-color)',
@@ -330,6 +437,26 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 </div>
               </div>
             ))}
+            {transactions.length > 5 && (
+              <div className="flex justify-center" style={{ paddingTop: 'var(--space-4)' }}>
+                <button
+                  type="button"
+                  onClick={() => onNavigate && onNavigate('reports')}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: 'var(--emerald-gains)',
+                    fontSize: '0.85rem',
+                    fontWeight: 650,
+                    cursor: 'pointer',
+                    textDecoration: 'underline',
+                    padding: '4px 0',
+                  }}
+                >
+                  View Full Ledger ({transactions.length} entries)
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>
