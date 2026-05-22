@@ -40,7 +40,7 @@ interface RecurringItem {
   description: string;
   amount: number;
   type: 'income' | 'expense';
-  category: 'needs' | 'wants' | 'savings' | 'income';
+  category: string;
 }
 
 interface SavingsBucket {
@@ -439,7 +439,24 @@ function App() {
         .update({ current_balance: newBalance })
         .eq('id', session.user.id);
     } catch (err) {
-      console.error('Error logging transaction:', err);
+      console.error('Error adding transaction:', err);
+    }
+  };
+
+  const handleUpdateGeneralBalance = async (newBalance: number) => {
+    if (!session?.user) {
+      setGeneralBalance(newBalance);
+      return;
+    }
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ current_balance: newBalance })
+        .eq('id', session.user.id);
+      if (error) throw error;
+      setGeneralBalance(newBalance);
+    } catch (err: any) {
+      console.error('Error updating general balance:', err.message);
     }
   };
 
@@ -499,7 +516,7 @@ function App() {
     desc: string,
     amount: number,
     type: 'income' | 'expense',
-    category: 'needs' | 'wants' | 'savings' | 'income'
+    category: string
   ) => {
     if (!session?.user) return;
     try {
@@ -974,6 +991,8 @@ function App() {
                   key="dashboard"
                   income={activeInflowSum || monthlyIncome}
                   balance={totalNetWorth}
+                  generalBalance={generalBalance}
+                  onUpdateGeneralBalance={handleUpdateGeneralBalance}
                   goal={primaryGoal}
                   transactions={transactions}
                   onAddTransaction={handleAddTransaction}

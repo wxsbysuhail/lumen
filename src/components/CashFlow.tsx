@@ -1,22 +1,59 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Plus, Trash2, Edit2 } from 'lucide-react';
+import { Plus, Trash2, Edit2, ChevronDown, Search } from 'lucide-react';
 
 interface RecurringItem {
   id: string;
   description: string;
   amount: number;
   type: 'income' | 'expense';
-  category: 'needs' | 'wants' | 'savings' | 'income';
+  category: string;
 }
 
 interface CashFlowProps {
   incomeItems: RecurringItem[];
   expenseItems: RecurringItem[];
-  onAddRecurring: (desc: string, amount: number, type: 'income' | 'expense', category: 'needs' | 'wants' | 'savings' | 'income') => void;
+  onAddRecurring: (desc: string, amount: number, type: 'income' | 'expense', category: string) => void;
   onRemoveRecurring: (id: string) => void;
-  onUpdateRecurring: (id: string, desc: string, amount: number, type: 'income' | 'expense', category: 'needs' | 'wants' | 'savings' | 'income') => void;
+  onUpdateRecurring: (id: string, desc: string, amount: number, type: 'income' | 'expense', category: string) => void;
 }
+
+const STANDARD_CATEGORIES = {
+  needs: ['Rent', 'Lease', 'Groceries', 'Utilities', 'Transport', 'Insurance', 'Medical', 'Other Need'],
+  wants: ['Dining Out', 'Leisure', 'Subscriptions', 'Gym & Fitness', 'Shopping', 'Travel', 'Other Want'],
+  savings: ['SIP & Investment', 'Pension & Retirement', 'Emergency Fund', 'Other Saving'],
+};
+
+const parseCategory = (cat: string) => {
+  if (!cat) return { classification: 'needs', name: 'Needs' };
+  if (cat.includes(':')) {
+    const [classification, name] = cat.split(':');
+    return { classification, name };
+  }
+  return { classification: cat, name: cat.charAt(0).toUpperCase() + cat.slice(1) };
+};
+
+const renderCategoryDisplay = (catString: string) => {
+  const { classification, name } = parseCategory(catString);
+  if (catString === 'income') return 'Income';
+  return (
+    <div className="flex align-center justify-between" style={{ width: '100%', gap: '8px' }}>
+      <span style={{ fontWeight: 500 }}>{name}</span>
+      <span style={{
+        fontSize: '0.65rem',
+        color: classification === 'needs' ? 'var(--coral-losses)' : classification === 'wants' ? '#e2a83b' : 'var(--emerald-gains)',
+        textTransform: 'uppercase',
+        fontWeight: 700,
+        letterSpacing: '0.04em',
+        padding: '2px 6px',
+        borderRadius: '4px',
+        backgroundColor: 'rgba(10, 10, 10, 0.03)',
+      }}>
+        {classification}
+      </span>
+    </div>
+  );
+};
 
 export const CashFlow: React.FC<CashFlowProps> = ({
   incomeItems,
@@ -34,7 +71,12 @@ export const CashFlow: React.FC<CashFlowProps> = ({
   const [desc, setDesc] = useState('');
   const [amount, setAmount] = useState('');
   const [type, setType] = useState<'income' | 'expense'>('expense');
-  const [category, setCategory] = useState<'needs' | 'wants' | 'savings' | 'income'>('needs');
+  const [category, setCategory] = useState<string>('needs:Other Need');
+
+  // Custom dropdown states
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [activeTab, setActiveTab] = useState<'needs' | 'wants' | 'savings'>('needs');
 
   // Edit and Delete states
   const [editingItem, setEditingItem] = useState<RecurringItem | null>(null);
@@ -174,7 +216,13 @@ export const CashFlow: React.FC<CashFlowProps> = ({
     setDesc(item.description);
     setAmount(item.amount.toLocaleString('en-US'));
     setType(item.type);
-    setCategory(item.category === 'income' ? 'needs' : item.category);
+    setCategory(item.category);
+    
+    const parsed = parseCategory(item.category);
+    setSearchQuery(parsed.name === 'Needs' || parsed.name === 'Wants' || parsed.name === 'Savings' ? '' : parsed.name);
+    if (parsed.classification !== 'income') {
+      setActiveTab(parsed.classification as any);
+    }
   };
 
   const cancelEdit = () => {
@@ -182,7 +230,8 @@ export const CashFlow: React.FC<CashFlowProps> = ({
     setDesc('');
     setAmount('');
     setType('expense');
-    setCategory('needs');
+    setCategory('needs:Other Need');
+    setSearchQuery('');
   };
 
   // Calculations for Actuals vs Suggestions
@@ -190,9 +239,9 @@ export const CashFlow: React.FC<CashFlowProps> = ({
   const suggestedWants = (totalIncome * wantsPct) / 100;
   const suggestedSavings = (totalIncome * savingsPct) / 100;
 
-  const actualNeeds = expenseItems.filter(e => e.category === 'needs').reduce((acc, e) => acc + e.amount, 0);
-  const actualWants = expenseItems.filter(e => e.category === 'wants').reduce((acc, e) => acc + e.amount, 0);
-  const actualSavings = expenseItems.filter(e => e.category === 'savings').reduce((acc, e) => acc + e.amount, 0);
+  const actualNeeds = expenseItems.filter(e => parseCategory(e.category).classification === 'needs').reduce((acc, e) => acc + e.amount, 0);
+  const actualWants = expenseItems.filter(e => parseCategory(e.category).classification === 'wants').reduce((acc, e) => acc + e.amount, 0);
+  const actualSavings = expenseItems.filter(e => parseCategory(e.category).classification === 'savings').reduce((acc, e) => acc + e.amount, 0);
 
   return (
     <motion.div
@@ -470,7 +519,7 @@ export const CashFlow: React.FC<CashFlowProps> = ({
                     fontSize: '0.85rem',
                     padding: '8px 0',
                   }}
-                  onClick={() => { setType('expense'); setCategory('needs'); }}
+                  onClick={() => { setType('expense'); setCategory('needs:Other Need'); }}
                 >
                   Monthly Outflow
                 </button>
@@ -517,18 +566,192 @@ export const CashFlow: React.FC<CashFlowProps> = ({
             </div>
 
             {type === 'expense' && (
-              <div className="input-group">
+              <div className="input-group" style={{ position: 'relative' }}>
                 <label className="input-label">Commitment Category</label>
-                <select
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value as any)}
-                  className="input-field"
-                  style={{ appearance: 'none', background: 'var(--bg-color)' }}
+                <button
+                  type="button"
+                  className="input-field flex justify-between align-center"
+                  style={{
+                    background: 'var(--bg-color)',
+                    textAlign: 'left',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    padding: 'var(--space-3) var(--space-4)',
+                    border: '1px solid var(--border-color)',
+                    borderRadius: 'var(--radius-md)',
+                  }}
+                  onClick={() => {
+                    setDropdownOpen(!dropdownOpen);
+                    const parsed = parseCategory(category);
+                    setSearchQuery(parsed.name === 'Needs' || parsed.name === 'Wants' || parsed.name === 'Savings' || parsed.name === 'Other Need' || parsed.name === 'Other Want' || parsed.name === 'Other Saving' ? '' : parsed.name);
+                    if (parsed.classification !== 'income') {
+                      setActiveTab(parsed.classification as any);
+                    }
+                  }}
                 >
-                  <option value="needs">Needs (Rent, Bills, Food)</option>
-                  <option value="wants">Wants (Subscriptions, Gym, Club)</option>
-                  <option value="savings">Savings (SIP, Pension, Emergency)</option>
-                </select>
+                  {renderCategoryDisplay(category)}
+                  <ChevronDown size={16} style={{ color: 'var(--ink-muted)', transform: dropdownOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+                </button>
+
+                {dropdownOpen && (
+                  <>
+                    <div
+                      style={{
+                        position: 'fixed',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        zIndex: 99,
+                      }}
+                      onClick={() => setDropdownOpen(false)}
+                    />
+                    <motion.div
+                      initial={{ opacity: 0, y: 4, scale: 0.98 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: 4, scale: 0.98 }}
+                      transition={{ duration: 0.15, ease: 'easeOut' }}
+                      style={{
+                        position: 'absolute',
+                        top: '100%',
+                        left: 0,
+                        right: 0,
+                        marginTop: '4px',
+                        backgroundColor: '#FFFFFF',
+                        border: '1px solid rgba(10, 10, 10, 0.08)',
+                        borderRadius: 'var(--radius-md)',
+                        boxShadow: '0 8px 24px rgba(10, 10, 10, 0.08)',
+                        zIndex: 100,
+                        padding: '12px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '8px',
+                      }}
+                    >
+                      {/* Search Input */}
+                      <div className="flex align-center gap-2" style={{
+                        border: '1px solid var(--border-color)',
+                        borderRadius: '4px',
+                        padding: '4px 8px',
+                        backgroundColor: 'var(--bg-color)',
+                      }}>
+                        <Search size={14} style={{ color: 'var(--ink-muted)' }} />
+                        <input
+                          type="text"
+                          placeholder="Search or type custom..."
+                          value={searchQuery}
+                          onChange={(e) => setSearchQuery(e.target.value)}
+                          style={{
+                            border: 'none',
+                            outline: 'none',
+                            background: 'transparent',
+                            fontSize: '0.85rem',
+                            width: '100%',
+                            color: 'var(--ink-color)',
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      </div>
+
+                      {/* Tabs */}
+                      <div className="flex gap-1" style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '4px' }}>
+                        {(['needs', 'wants', 'savings'] as const).map(tab => (
+                          <button
+                            key={tab}
+                            type="button"
+                            style={{
+                              flex: 1,
+                              padding: '4px 0',
+                              fontSize: '0.75rem',
+                              fontWeight: activeTab === tab ? 600 : 400,
+                              border: 'none',
+                              background: activeTab === tab ? 'var(--ink-color)' : 'none',
+                              color: activeTab === tab ? 'var(--bg-color)' : 'var(--ink-muted)',
+                              borderRadius: '4px',
+                              cursor: 'pointer',
+                              transition: 'all 0.2s',
+                            }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setActiveTab(tab);
+                            }}
+                          >
+                            {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* Suggestions list */}
+                      <div style={{ maxHeight: '150px', overflowY: 'auto' }} className="flex flex-col gap-1">
+                        {/* Custom option if query doesn't match */}
+                        {searchQuery.trim() !== '' && !STANDARD_CATEGORIES[activeTab].some(c => c.toLowerCase() === searchQuery.trim().toLowerCase()) && (
+                          <button
+                            type="button"
+                            style={{
+                              width: '100%',
+                              textAlign: 'left',
+                              padding: '8px 10px',
+                              border: 'none',
+                              background: 'rgba(15, 122, 92, 0.05)',
+                              color: 'var(--emerald-gains)',
+                              fontSize: '0.82rem',
+                              borderRadius: '4px',
+                              cursor: 'pointer',
+                              fontWeight: 600,
+                            }}
+                            onClick={() => {
+                              setCategory(`${activeTab}:${searchQuery.trim()}`);
+                              setDropdownOpen(false);
+                            }}
+                          >
+                            + Create "{searchQuery.trim()}" in {activeTab.toUpperCase()}
+                          </button>
+                        )}
+
+                        {STANDARD_CATEGORIES[activeTab]
+                          .filter(c => c.toLowerCase().includes(searchQuery.toLowerCase()))
+                          .map((c) => {
+                            const isSelected = category === `${activeTab}:${c}` || (category === activeTab && c === (activeTab === 'needs' ? 'Other Need' : activeTab === 'wants' ? 'Other Want' : 'Other Saving'));
+                            return (
+                              <button
+                                key={c}
+                                type="button"
+                                style={{
+                                  width: '100%',
+                                  textAlign: 'left',
+                                  padding: '8px 10px',
+                                  border: 'none',
+                                  background: isSelected ? 'rgba(10, 10, 10, 0.04)' : 'none',
+                                  color: 'var(--ink-color)',
+                                  fontSize: '0.82rem',
+                                  borderRadius: '4px',
+                                  cursor: 'pointer',
+                                  display: 'flex',
+                                  justifyContent: 'space-between',
+                                  alignItems: 'center',
+                                  transition: 'background 0.2s',
+                                }}
+                                onMouseEnter={(e) => {
+                                  if (!isSelected) e.currentTarget.style.backgroundColor = 'rgba(10, 10, 10, 0.02)';
+                                }}
+                                onMouseLeave={(e) => {
+                                  if (!isSelected) e.currentTarget.style.backgroundColor = 'transparent';
+                                }}
+                                onClick={() => {
+                                  setCategory(`${activeTab}:${c}`);
+                                  setDropdownOpen(false);
+                                }}
+                              >
+                                <span style={{ fontWeight: isSelected ? 600 : 400 }}>{c}</span>
+                              </button>
+                            );
+                          })}
+                      </div>
+                    </motion.div>
+                  </>
+                )}
               </div>
             )}
 
@@ -607,8 +830,10 @@ export const CashFlow: React.FC<CashFlowProps> = ({
                     borderBottom: '1px solid var(--border-color)',
                   }}>
                     <div className="flex flex-col" style={{ flex: 1, paddingRight: 'var(--space-2)' }}>
-                      <span style={{ fontWeight: 550, fontSize: '0.9rem' }}>{item.description}</span>
-                      <span style={{ fontSize: '0.75rem', color: 'var(--ink-light)', textTransform: 'capitalize' }}>{item.category}</span>
+                       <span style={{ fontWeight: 550, fontSize: '0.9rem' }}>{item.description}</span>
+                       <span style={{ fontSize: '0.75rem', color: 'var(--ink-light)' }}>
+                         {parseCategory(item.category).name} <span style={{ opacity: 0.5 }}>•</span> <span style={{ textTransform: 'capitalize' }}>{parseCategory(item.category).classification}</span>
+                       </span>
                     </div>
                     {confirmDeleteId === item.id ? (
                       <div className="flex align-center gap-2" style={{ backgroundColor: 'rgba(232, 93, 93, 0.05)', padding: '4px 8px', borderRadius: '4px' }}>
