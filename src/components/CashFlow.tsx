@@ -502,7 +502,7 @@ export const CashFlow: React.FC<CashFlowProps> = ({
       {/* Inputs for adding entries */}
       <div className="grid grid-2 gap-6">
         {/* Left: Logger */}
-        <div className="card">
+        <div className="card" style={{ overflow: 'visible' }}>
           <div className="card-title">{editingItem ? 'Edit Recurring Contract' : 'Add Recurring Contract'}</div>
           <form onSubmit={handleAdd} className="flex flex-col gap-4">
             <div className="input-group">

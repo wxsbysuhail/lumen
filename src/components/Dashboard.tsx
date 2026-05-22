@@ -362,6 +362,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
               padding: 'var(--space-6)',
               backgroundColor: '#FFFFFF',
               boxShadow: '0 20px 40px rgba(0,0,0,0.06)',
+              overflow: 'visible',
             }}
           >
             <h3 className="serif-title" style={{ fontSize: '1.6rem', marginBottom: 'var(--space-4)' }}>Log Entry</h3>
