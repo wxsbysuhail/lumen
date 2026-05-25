@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, useMotionValue, useTransform, animate } from 'framer-motion';
-import { ArrowUpRight, ArrowDownRight, Plus, Calendar, TrendingUp, Edit2, ChevronDown, Search, Wallet, PiggyBank } from 'lucide-react';
+import { ArrowUpRight, ArrowDownRight, Plus, Calendar, TrendingUp, Edit2, ChevronDown, Search, Wallet, PiggyBank, Info } from 'lucide-react';
 
 interface Transaction {
   id: string;
@@ -23,6 +23,8 @@ interface DashboardProps {
   totalBucketSavings?: number;
   holdingsValue?: number;
   onNavigate?: (tab: 'dashboard' | 'cashflow' | 'savings' | 'investments' | 'projection' | 'reports' | 'insights') => void;
+  recurringExpenses?: number;
+  savingsTargetsSum?: number;
 }
 
 // Custom Motion Count-up Component
@@ -55,6 +57,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
   totalBucketSavings = 0,
   holdingsValue = 0,
   onNavigate,
+  recurringExpenses = 0,
+  savingsTargetsSum = 0,
 }) => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [desc, setDesc] = useState('');
@@ -65,6 +69,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
   // Balance adjust modal states
   const [showAdjustModal, setShowAdjustModal] = useState(false);
   const [newBalanceInput, setNewBalanceInput] = useState('');
+
+  // Safe to Spend modal state
+  const [showSafeToSpendModal, setShowSafeToSpendModal] = useState(false);
 
   // Category select dropdown states
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -86,6 +93,77 @@ export const Dashboard: React.FC<DashboardProps> = ({
   // Calculate totals
   const totalIn = transactions.filter(t => t.type === 'income').reduce((acc, t) => acc + t.amount, 0);
   const totalOut = transactions.filter(t => t.type === 'expense').reduce((acc, t) => acc + t.amount, 0);
+
+  // 1. Calculate billing cycle boundary (from 26th of last month to 25th of current month, or 26th of this month to 25th of next month)
+  const getCurrentCycleRange = () => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth(); // 0-indexed
+    const day = now.getDate();
+
+    let startYear = year;
+    let startMonth = month;
+    let endYear = year;
+    let endMonth = month;
+
+    if (day >= 26) {
+      startMonth = month;
+      endMonth = month + 1;
+      if (endMonth > 11) {
+        endMonth = 0;
+        endYear += 1;
+      }
+    } else {
+      startMonth = month - 1;
+      if (startMonth < 0) {
+        startMonth = 11;
+        startYear -= 1;
+      }
+      endMonth = month;
+    }
+
+    const startDate = new Date(startYear, startMonth, 26, 0, 0, 0);
+    const endDate = new Date(endYear, endMonth, 25, 23, 59, 59);
+
+    return { startDate, endDate, startMonth, startYear };
+  };
+
+  const { startDate, endDate, startMonth } = getCurrentCycleRange();
+
+  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const currentCycleLabel = `${monthNames[startMonth]} 26 - ${monthNames[endDate.getMonth()]} 25`;
+
+  // 2. Filter transactions that fell into the current cycle
+  const currentCycleTransactions = transactions.filter(t => {
+    const tDate = new Date(t.date);
+    return tDate >= startDate && tDate <= endDate;
+  });
+
+  // Calculate daily variable expenses in this cycle
+  const loggedExpensesThisCycle = currentCycleTransactions
+    .filter(t => t.type === 'expense')
+    .reduce((acc, t) => acc + t.amount, 0);
+
+  // Calculate manual inflows logged in this cycle
+  const loggedInflowsThisCycle = currentCycleTransactions
+    .filter(t => t.type === 'income')
+    .reduce((acc, t) => acc + t.amount, 0);
+
+  // Avoid double counting salary if already logged in currentCycleTransactions
+  const recurringInflowsThisCycle = currentCycleTransactions
+    .filter(t => t.type === 'income' && /base|salary|transport/i.test(t.description))
+    .reduce((acc, t) => acc + t.amount, 0);
+
+  const extraInflowsThisCycle = Math.max(0, loggedInflowsThisCycle - recurringInflowsThisCycle);
+  const totalInflowForCycle = income + extraInflowsThisCycle;
+
+  // Safe to Spend calculations
+  const startingDisposablePool = Math.max(0, totalInflowForCycle - recurringExpenses - savingsTargetsSum);
+  const safeToSpend = startingDisposablePool - loggedExpensesThisCycle;
+
+  const nowTime = new Date();
+  const daysRemaining = Math.max(1, Math.ceil((endDate.getTime() - nowTime.getTime()) / (1000 * 60 * 60 * 24)));
+  const dailyAllowance = Math.round(Math.max(0, safeToSpend) / daysRemaining);
   
   // Suggested categories based on type
   const categories = type === 'income' 
@@ -309,6 +387,114 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </button>
           ))}
         </div>
+      </div>
+
+      {/* Safe to Spend Card */}
+      <div className="card flex flex-col justify-between" style={{
+        padding: 'var(--space-5) var(--space-6)',
+        backgroundColor: '#FFFFFF',
+        position: 'relative',
+        overflow: 'hidden',
+      }}>
+        {/* Soft warning/danger/success aura glow behind the card */}
+        <div style={{
+          position: 'absolute',
+          top: '-20%',
+          right: '-10%',
+          width: '180px',
+          height: '180px',
+          background: safeToSpend > 5000 
+            ? 'radial-gradient(circle, rgba(15, 122, 92, 0.04) 0%, rgba(255, 255, 255, 0) 70%)'
+            : safeToSpend > 0 
+              ? 'radial-gradient(circle, rgba(234, 179, 8, 0.04) 0%, rgba(255, 255, 255, 0) 70%)'
+              : 'radial-gradient(circle, rgba(239, 68, 68, 0.04) 0%, rgba(255, 255, 255, 0) 70%)',
+          pointerEvents: 'none',
+          zIndex: 0,
+        }} />
+
+        <div className="flex justify-between align-center" style={{ zIndex: 1, width: '100%' }}>
+          <div className="flex align-center gap-2">
+            <span className="card-title" style={{ margin: 0, fontSize: '0.78rem', letterSpacing: '0.05em' }}>SAFE TO SPEND THIS MONTH</span>
+            <button
+              type="button"
+              onClick={() => setShowSafeToSpendModal(true)}
+              style={{
+                background: 'none',
+                border: 'none',
+                padding: '2px',
+                cursor: 'pointer',
+                color: 'var(--ink-muted)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                opacity: 0.6,
+                transition: 'opacity 0.2s',
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
+              onMouseLeave={(e) => e.currentTarget.style.opacity = '0.6'}
+            >
+              <Info size={14} />
+            </button>
+          </div>
+          <span style={{ fontSize: '0.78rem', color: 'var(--ink-muted)', fontWeight: 500 }}>
+            Cycle: {currentCycleLabel}
+          </span>
+        </div>
+
+        <div className="flex justify-between align-end" style={{ marginTop: '12px', zIndex: 1 }}>
+          <div>
+            <h2 className="num" style={{
+              fontSize: '2.2rem',
+              fontWeight: 400,
+              letterSpacing: '-0.03em',
+              lineHeight: 1,
+              color: safeToSpend > 5000 ? 'var(--ink-color)' : safeToSpend > 0 ? '#CA8A04' : 'var(--coral-losses)'
+            }}>
+              Rs. {safeToSpend.toLocaleString('en-US')}
+            </h2>
+            <p style={{ color: 'var(--ink-muted)', fontSize: '0.78rem', marginTop: '6px' }}>
+              {safeToSpend > 5000 
+                ? 'Your spending is well within safe boundaries.' 
+                : safeToSpend > 0 
+                  ? 'Approaching budget limits. Spend cautiously.' 
+                  : 'You have exceeded your safe spending limit.'}
+            </p>
+          </div>
+
+          <div style={{ textAlign: 'right' }}>
+            <span style={{ fontSize: '0.75rem', color: 'var(--ink-muted)' }}>Daily Allowance</span>
+            <h4 className="num" style={{ fontSize: '1.1rem', fontWeight: 600, color: 'var(--ink-color)' }}>
+              Rs. {dailyAllowance.toLocaleString('en-US')}/day
+            </h4>
+            <span style={{ fontSize: '0.7rem', color: 'var(--ink-muted)' }}>
+              for {daysRemaining} days left
+            </span>
+          </div>
+        </div>
+
+        {/* Progress bar representing remaining budget */}
+        {startingDisposablePool > 0 && (
+          <div style={{
+            width: '100%',
+            height: '6px',
+            backgroundColor: 'var(--border-color)',
+            borderRadius: '3px',
+            overflow: 'hidden',
+            marginTop: '16px',
+            zIndex: 1,
+          }}>
+            <div style={{
+              height: '100%',
+              backgroundColor: safeToSpend > 5000 
+                ? 'var(--emerald-gains)' 
+                : safeToSpend > 0 
+                  ? '#EAB308' 
+                  : 'var(--coral-losses)',
+              width: `${Math.max(0, Math.min(100, (safeToSpend / startingDisposablePool) * 100))}%`,
+              transition: 'width 0.8s cubic-bezier(0.16, 1, 0.3, 1)',
+            }} />
+          </div>
+        )}
       </div>
 
       {/* Cash Flow and Savings rate Grid */}
@@ -805,6 +991,113 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 </button>
               </div>
             </form>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Safe to Spend Info Modal */}
+      {showSafeToSpendModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(10, 10, 10, 0.4)',
+          backdropFilter: 'blur(4px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+          padding: 'var(--space-4)',
+        }}>
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+            className="card"
+            style={{
+              width: '100%',
+              maxWidth: '480px',
+              padding: 'var(--space-6)',
+              backgroundColor: '#FFFFFF',
+              boxShadow: '0 20px 40px rgba(0,0,0,0.06)',
+            }}
+          >
+            <h3 className="serif-title" style={{ fontSize: '1.6rem', marginBottom: 'var(--space-2)' }}>Safe to Spend Breakdown</h3>
+            <p style={{ fontSize: '0.82rem', color: 'var(--ink-muted)', marginBottom: 'var(--space-4)', lineHeight: 1.4 }}>
+              This displays how much cash you can safely spend on variable daily expenses (discretionary items, dining, shopping, etc.) during your current salary cycle (<strong>{currentCycleLabel}</strong>) without affecting your bills or savings target commitments.
+            </p>
+
+            <div style={{
+              backgroundColor: 'var(--bg-color)',
+              padding: 'var(--space-4)',
+              borderRadius: 'var(--radius-md)',
+              border: '1px solid var(--border-color)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '12px'
+            }}>
+              <div className="flex justify-between" style={{ fontSize: '0.85rem' }}>
+                <span style={{ color: 'var(--ink-muted)' }}>1. Expected Regular Inflow:</span>
+                <span className="num text-gain" style={{ fontWeight: 550 }}>
+                  + Rs. {income.toLocaleString('en-US')}
+                </span>
+              </div>
+              <div className="flex justify-between" style={{ fontSize: '0.85rem' }}>
+                <span style={{ color: 'var(--ink-muted)' }}>2. Extra Inflows Logged:</span>
+                <span className="num text-gain" style={{ fontWeight: 550 }}>
+                  + Rs. {extraInflowsThisCycle.toLocaleString('en-US')}
+                </span>
+              </div>
+              <div className="flex justify-between" style={{ fontSize: '0.85rem' }}>
+                <span style={{ color: 'var(--ink-muted)' }}>3. Committed Recurring Bills:</span>
+                <span className="num text-loss" style={{ fontWeight: 550 }}>
+                  - Rs. {recurringExpenses.toLocaleString('en-US')}
+                </span>
+              </div>
+              <div className="flex justify-between" style={{ fontSize: '0.85rem' }}>
+                <span style={{ color: 'var(--ink-muted)' }}>4. Active Savings Goals:</span>
+                <span className="num text-loss" style={{ fontWeight: 550 }}>
+                  - Rs. {savingsTargetsSum.toLocaleString('en-US')}
+                </span>
+              </div>
+              
+              <div style={{ borderTop: '1px dashed var(--border-color)', margin: '4px 0' }} />
+              
+              <div className="flex justify-between" style={{ fontSize: '0.85rem' }}>
+                <span style={{ fontWeight: 600, color: 'var(--ink-color)' }}>Starting Disposable Pool:</span>
+                <span className="num" style={{ fontWeight: 700, color: 'var(--ink-color)' }}>
+                  Rs. {startingDisposablePool.toLocaleString('en-US')}
+                </span>
+              </div>
+              
+              <div className="flex justify-between" style={{ fontSize: '0.85rem' }}>
+                <span style={{ color: 'var(--ink-muted)' }}>5. Daily Expenses Logged:</span>
+                <span className="num text-loss" style={{ fontWeight: 550 }}>
+                  - Rs. {loggedExpensesThisCycle.toLocaleString('en-US')}
+                </span>
+              </div>
+              
+              <div style={{ borderTop: '1px solid var(--border-color)', margin: '4px 0' }} />
+              
+              <div className="flex justify-between" style={{ fontSize: '0.9rem', paddingTop: '4px' }}>
+                <span style={{ fontWeight: 650 }}>Safe to Spend Remaining:</span>
+                <span className="num" style={{ 
+                  fontWeight: 750, 
+                  color: safeToSpend > 5000 ? 'var(--emerald-gains)' : safeToSpend > 0 ? '#EAB308' : 'var(--coral-losses)' 
+                }}>
+                  Rs. {safeToSpend.toLocaleString('en-US')}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex justify-center" style={{ marginTop: 'var(--space-6)' }}>
+              <button type="button" className="btn btn-primary" style={{ width: '100%' }} onClick={() => setShowSafeToSpendModal(false)}>
+                Got it
+              </button>
+            </div>
           </motion.div>
         </div>
       )}

@@ -990,6 +990,7 @@ function App() {
 
   const totalBucketSavings = buckets.reduce((acc, b) => acc + b.current, 0);
   const totalNetWorth = generalBalance + totalBucketSavings + getHoldingsValue();
+  const savingsTargetsSum = buckets.reduce((acc, b) => acc + b.monthlyContribution, 0);
 
   if (authLoading) {
     return (
@@ -1172,6 +1173,8 @@ function App() {
                   totalBucketSavings={totalBucketSavings}
                   holdingsValue={getHoldingsValue()}
                   onNavigate={navigateTo}
+                  recurringExpenses={activeOutflowSum}
+                  savingsTargetsSum={savingsTargetsSum}
                 />
               )}
 
