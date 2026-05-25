@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Plus, CheckCircle2, Edit2, Trash2, AlertCircle } from 'lucide-react';
+import { Plus, CheckCircle2, Edit2, Trash2, AlertCircle, X } from 'lucide-react';
+
 
 interface SavingsBucket {
   id: string;
@@ -323,7 +324,7 @@ export const SavingsTracker: React.FC<SavingsTrackerProps> = ({
         })}
       </div>
 
-      {/* Add Bucket Modal */}
+      {/* Add Bucket Drawer */}
       {showAddForm && (
         <div style={{
           position: 'fixed',
@@ -332,26 +333,52 @@ export const SavingsTracker: React.FC<SavingsTrackerProps> = ({
           right: 0,
           bottom: 0,
           backgroundColor: 'rgba(10, 10, 10, 0.4)',
-          backdropFilter: 'blur(4px)',
+          backdropFilter: 'blur(8px)',
           display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 1000,
-          padding: 'var(--space-4)',
+          justifyContent: 'flex-end',
+          zIndex: 2000,
         }}>
+          {/* Backdrop click handler to close */}
+          <div 
+            style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, cursor: 'pointer' }}
+            onClick={() => setShowAddForm(false)}
+          />
+
           <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.95 }}
+            initial={{ x: '100%', opacity: 0.9 }}
+            animate={{ x: 0, opacity: 1 }}
+            exit={{ x: '100%', opacity: 0.9 }}
+            transition={{ type: 'spring', damping: 28, stiffness: 240 }}
             className="card"
             style={{
               width: '100%',
-              maxWidth: '400px',
-              backgroundColor: '#FFFFFF',
-              boxShadow: '0 20px 40px rgba(0,0,0,0.06)',
+              maxWidth: '460px',
+              height: '100%',
+              maxHeight: '100vh',
+              backgroundColor: 'var(--card-bg)',
+              borderRadius: '24px 0 0 24px',
+              borderLeft: '1px solid var(--border-color)',
+              boxShadow: '-10px 0 40px rgba(0,0,0,0.08)',
+              padding: '32px',
+              display: 'flex',
+              flexDirection: 'column',
+              zIndex: 2001,
+              position: 'relative',
+              overflowY: 'auto'
             }}
           >
-            <h3 className="serif-title" style={{ fontSize: '1.6rem', marginBottom: 'var(--space-4)' }}>Create Savings Bucket</h3>
+            <div className="flex justify-between align-center" style={{ marginBottom: '24px' }}>
+              <h3 className="serif-title" style={{ fontSize: '1.8rem', margin: 0 }}>Create Savings Bucket</h3>
+              <button 
+                type="button" 
+                className="btn btn-secondary" 
+                style={{ padding: 0, borderRadius: '50%', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center' }} 
+                onClick={() => setShowAddForm(false)}
+              >
+                <X size={16} />
+              </button>
+            </div>
+
             <form onSubmit={handleCreate} className="flex flex-col gap-4">
               <div className="input-group">
                 <label className="input-label">Bucket Label</label>
@@ -535,7 +562,7 @@ export const SavingsTracker: React.FC<SavingsTrackerProps> = ({
         </div>
       )}
 
-      {/* Deposit to Bucket Modal */}
+      {/* Deposit to Bucket Drawer */}
       {depositBucketId && (
         <div style={{
           position: 'fixed',
@@ -544,26 +571,52 @@ export const SavingsTracker: React.FC<SavingsTrackerProps> = ({
           right: 0,
           bottom: 0,
           backgroundColor: 'rgba(10, 10, 10, 0.4)',
-          backdropFilter: 'blur(4px)',
+          backdropFilter: 'blur(8px)',
           display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 1000,
-          padding: 'var(--space-4)',
+          justifyContent: 'flex-end',
+          zIndex: 2000,
         }}>
+          {/* Backdrop click handler to close */}
+          <div 
+            style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, cursor: 'pointer' }}
+            onClick={() => setDepositBucketId(null)}
+          />
+
           <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.95 }}
+            initial={{ x: '100%', opacity: 0.9 }}
+            animate={{ x: 0, opacity: 1 }}
+            exit={{ x: '100%', opacity: 0.9 }}
+            transition={{ type: 'spring', damping: 28, stiffness: 240 }}
             className="card"
             style={{
               width: '100%',
-              maxWidth: '400px',
-              backgroundColor: '#FFFFFF',
-              boxShadow: '0 20px 40px rgba(0,0,0,0.06)',
+              maxWidth: '460px',
+              height: '100%',
+              maxHeight: '100vh',
+              backgroundColor: 'var(--card-bg)',
+              borderRadius: '24px 0 0 24px',
+              borderLeft: '1px solid var(--border-color)',
+              boxShadow: '-10px 0 40px rgba(0,0,0,0.08)',
+              padding: '32px',
+              display: 'flex',
+              flexDirection: 'column',
+              zIndex: 2001,
+              position: 'relative',
+              overflowY: 'auto'
             }}
           >
-            <h3 className="serif-title" style={{ fontSize: '1.6rem', marginBottom: 'var(--space-2)' }}>Transfer Cash to Bucket</h3>
+            <div className="flex justify-between align-center" style={{ marginBottom: '16px' }}>
+              <h3 className="serif-title" style={{ fontSize: '1.8rem', margin: 0 }}>Transfer Cash to Bucket</h3>
+              <button 
+                type="button" 
+                className="btn btn-secondary" 
+                style={{ padding: 0, borderRadius: '50%', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center' }} 
+                onClick={() => setDepositBucketId(null)}
+              >
+                <X size={16} />
+              </button>
+            </div>
+
             <p style={{ fontSize: '0.85rem', color: 'var(--ink-muted)', marginBottom: 'var(--space-4)' }}>
               General cash will be deducted and allocated directly into this bucket.
             </p>
@@ -619,7 +672,7 @@ export const SavingsTracker: React.FC<SavingsTrackerProps> = ({
         </div>
       )}
 
-      {/* Edit Bucket Modal */}
+      {/* Edit Bucket Drawer */}
       {editingBucket && (
         <div style={{
           position: 'fixed',
@@ -628,28 +681,56 @@ export const SavingsTracker: React.FC<SavingsTrackerProps> = ({
           right: 0,
           bottom: 0,
           backgroundColor: 'rgba(10, 10, 10, 0.4)',
-          backdropFilter: 'blur(4px)',
+          backdropFilter: 'blur(8px)',
           display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 1000,
-          padding: 'var(--space-4)',
+          justifyContent: 'flex-end',
+          zIndex: 2000,
         }}>
+          {/* Backdrop click handler to close */}
+          <div 
+            style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, cursor: 'pointer' }}
+            onClick={() => setEditingBucket(null)}
+          />
+
           <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.95 }}
+            initial={{ x: '100%', opacity: 0.9 }}
+            animate={{ x: 0, opacity: 1 }}
+            exit={{ x: '100%', opacity: 0.9 }}
+            transition={{ type: 'spring', damping: 28, stiffness: 240 }}
             className="card"
             style={{
               width: '100%',
-              maxWidth: '400px',
-              backgroundColor: '#FFFFFF',
-              boxShadow: '0 20px 40px rgba(0,0,0,0.06)',
+              maxWidth: '460px',
+              height: '100%',
+              maxHeight: '100vh',
+              backgroundColor: 'var(--card-bg)',
+              borderRadius: '24px 0 0 24px',
+              borderLeft: '1px solid var(--border-color)',
+              boxShadow: '-10px 0 40px rgba(0,0,0,0.08)',
+              padding: '32px',
+              display: 'flex',
+              flexDirection: 'column',
+              zIndex: 2001,
+              position: 'relative',
+              overflowY: 'auto'
             }}
           >
+            <div className="flex justify-between align-center" style={{ marginBottom: '24px' }}>
+              <h3 className="serif-title" style={{ fontSize: '1.8rem', margin: 0 }}>
+                {showDeleteConfirm ? 'Delete Goal Bucket' : 'Edit Savings Goal'}
+              </h3>
+              <button 
+                type="button" 
+                className="btn btn-secondary" 
+                style={{ padding: 0, borderRadius: '50%', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center' }} 
+                onClick={() => setEditingBucket(null)}
+              >
+                <X size={16} />
+              </button>
+            </div>
+
             {showDeleteConfirm ? (
               <div className="flex flex-col gap-4">
-                <h3 className="serif-title text-loss" style={{ fontSize: '1.6rem', marginBottom: 'var(--space-1)' }}>Delete Goal Bucket?</h3>
                 <p style={{ fontSize: '0.9rem', color: 'var(--ink-color)', lineHeight: 1.4 }}>
                   Are you sure you want to delete the goal bucket <strong>"{editingBucket.name}"</strong>?
                 </p>
@@ -675,7 +756,7 @@ export const SavingsTracker: React.FC<SavingsTrackerProps> = ({
               </div>
             ) : (
               <form onSubmit={handleEditSubmit} className="flex flex-col gap-4">
-                <h3 className="serif-title" style={{ fontSize: '1.6rem', marginBottom: 'var(--space-2)' }}>Edit Savings Goal</h3>
+
                 
                 <div className="input-group">
                   <label className="input-label">Bucket Label</label>
