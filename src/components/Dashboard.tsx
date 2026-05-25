@@ -229,7 +229,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
         alignItems: 'center',
         textAlign: 'center',
         gap: 'var(--space-2)',
-        backgroundColor: '#FFFFFF',
+        backgroundColor: 'var(--card-bg)',
         position: 'relative',
         zIndex: 1,
       }}>
@@ -359,7 +359,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 gap: '6px',
                 padding: '6px 12px',
                 borderRadius: '20px',
-                backgroundColor: 'rgba(10, 10, 10, 0.02)',
+                backgroundColor: 'rgba(128, 128, 128, 0.06)',
                 border: '1px solid var(--border-color)',
                 fontSize: '0.78rem',
                 color: 'var(--ink-muted)',
@@ -367,12 +367,12 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 transition: 'all 0.2s ease',
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = 'rgba(10, 10, 10, 0.05)';
+                e.currentTarget.style.backgroundColor = 'rgba(128, 128, 128, 0.12)';
                 e.currentTarget.style.borderColor = item.color;
                 e.currentTarget.style.transform = 'translateY(-1px)';
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = 'rgba(10, 10, 10, 0.02)';
+                e.currentTarget.style.backgroundColor = 'rgba(128, 128, 128, 0.06)';
                 e.currentTarget.style.borderColor = 'var(--border-color)';
                 e.currentTarget.style.transform = 'translateY(0)';
               }}
@@ -392,7 +392,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
       {/* Safe to Spend Card */}
       <div className="card flex flex-col justify-between" style={{
         padding: 'var(--space-8)',
-        backgroundColor: '#FFFFFF',
+        backgroundColor: 'var(--card-bg)',
         position: 'relative',
         overflow: 'hidden',
         minHeight: '200px',
@@ -674,7 +674,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
               width: '100%',
               maxWidth: '400px',
               padding: 'var(--space-6)',
-              backgroundColor: '#FFFFFF',
+              backgroundColor: 'var(--card-bg)',
               boxShadow: '0 20px 40px rgba(0,0,0,0.06)',
               overflow: 'visible',
             }}
@@ -792,10 +792,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
                         left: 0,
                         right: 0,
                         marginTop: '4px',
-                        backgroundColor: '#FFFFFF',
-                        border: '1px solid rgba(10, 10, 10, 0.08)',
+                        backgroundColor: 'var(--card-bg)',
+                        border: '1px solid var(--border-color)',
                         borderRadius: 'var(--radius-md)',
-                        boxShadow: '0 8px 24px rgba(10, 10, 10, 0.08)',
+                        boxShadow: '0 8px 24px rgba(0, 0, 0, 0.12)',
                         zIndex: 100,
                         padding: '12px',
                         display: 'flex',
@@ -937,7 +937,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
               width: '100%',
               maxWidth: '400px',
               padding: 'var(--space-6)',
-              backgroundColor: '#FFFFFF',
+              backgroundColor: 'var(--card-bg)',
               boxShadow: '0 20px 40px rgba(0,0,0,0.06)',
             }}
           >
@@ -1022,7 +1022,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
               width: '100%',
               maxWidth: '480px',
               padding: 'var(--space-6)',
-              backgroundColor: '#FFFFFF',
+              backgroundColor: 'var(--card-bg)',
               boxShadow: '0 20px 40px rgba(0,0,0,0.06)',
             }}
           >
