@@ -1634,24 +1634,23 @@ function App() {
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
-                  transition={{ duration: 0.25, ease: 'linear' }}
+                  transition={{ duration: 0.2, ease: 'linear' }}
                   onClick={() => setShowMoreHub(false)}
                 />
 
-                {/* Sheet */}
+                {/* Centered modal */}
                 <motion.div
-                  className="hub-sheet"
-                  initial={{ y: '100%', x: '-50%' }}
-                  animate={{ y: 0, x: '-50%' }}
-                  exit={{ y: '100%', x: '-50%' }}
-                  transition={{ type: 'tween', ease: [0.16, 1, 0.3, 1], duration: 0.38 }}
+                  className="hub-modal"
+                  initial={{ opacity: 0, scale: 0.93, x: '-50%', y: '-50%' }}
+                  animate={{ opacity: 1, scale: 1, x: '-50%', y: '-50%' }}
+                  exit={{ opacity: 0, scale: 0.93, x: '-50%', y: '-50%' }}
+                  transition={{ type: 'tween', ease: [0.16, 1, 0.3, 1], duration: 0.28 }}
+                  style={{ top: '50%', left: '50%' }}
                 >
-                  <div className="hub-sheet-drag-handle" />
-                  
                   <div className="hub-sheet-header">
                     <h3 className="hub-sheet-title">More Hub</h3>
                     <button className="hub-sheet-close" onClick={() => setShowMoreHub(false)}>
-                      <X size={18} />
+                      <X size={16} />
                     </button>
                   </div>
 
@@ -1662,7 +1661,7 @@ function App() {
                         onClick={() => navigateTo('projection')}
                       >
                         <div className="hub-card-icon-wrapper">
-                          <LineChart size={20} />
+                          <LineChart size={18} />
                         </div>
                         <div className="hub-card-text">
                           <div className="hub-card-name">Wealth Projection</div>
@@ -1675,7 +1674,7 @@ function App() {
                         onClick={() => navigateTo('reports')}
                       >
                         <div className="hub-card-icon-wrapper">
-                          <PieChart size={20} />
+                          <PieChart size={18} />
                         </div>
                         <div className="hub-card-text">
                           <div className="hub-card-name">Reports & Charts</div>
@@ -1688,11 +1687,11 @@ function App() {
                         onClick={() => navigateTo('insights')}
                       >
                         <div className="hub-card-icon-wrapper">
-                          <Lightbulb size={20} />
+                          <Lightbulb size={18} />
                         </div>
                         <div className="hub-card-text">
                           <div className="hub-card-name">Financial Insights</div>
-                          <div className="hub-card-desc">Automated rules of thumb and customized optimization tips.</div>
+                          <div className="hub-card-desc">Automated rules of thumb and optimization tips.</div>
                         </div>
                       </button>
 
@@ -1701,20 +1700,21 @@ function App() {
                         onClick={() => navigateTo('joint')}
                       >
                         <div className="hub-card-icon-wrapper">
-                          <Users size={20} />
+                          <Users size={18} />
                         </div>
                         <div className="hub-card-text">
                           <div className="hub-card-name">Joint Sync & Splits</div>
-                          <div className="hub-card-desc">Link with a partner, split expenses, and settle debts.</div>
+                          <div className="hub-card-desc">Link with a partner, split expenses, settle debts.</div>
                         </div>
                       </button>
 
                       <button
                         className={`hub-card ${activeTab === 'assistant' ? 'active' : ''}`}
                         onClick={() => navigateTo('assistant')}
+                        style={{ gridColumn: '1 / -1' }}
                       >
                         <div className="hub-card-icon-wrapper" style={{ color: 'var(--emerald-gains)', backgroundColor: 'var(--emerald-gains-bg)' }}>
-                          <Bot size={20} />
+                          <Bot size={18} />
                         </div>
                         <div className="hub-card-text">
                           <div className="hub-card-name">AI Financial Coach</div>
@@ -1733,11 +1733,11 @@ function App() {
                         </button>
                       )}
                       <button className="hub-action-btn danger" onClick={() => { setShowMoreHub(false); handleReset(); }}>
-                        <RotateCcw size={14} />
-                        <span>Reset Application</span>
+                        <RotateCcw size={15} />
+                        <span>Reset</span>
                       </button>
                       <button className="hub-action-btn" onClick={() => { setShowMoreHub(false); handleSignOut(); }}>
-                        <LogOut size={14} />
+                        <LogOut size={15} />
                         <span>Sign Out</span>
                       </button>
                     </div>
