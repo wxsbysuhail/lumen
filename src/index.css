@@ -858,6 +858,15 @@ h1, h2, h3, h4, h5, h6 {
   100% { opacity: 0.8; }
 }
 
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.animate-spin {
+  animation: spin 1.2s linear infinite;
+}
+
 .pulsing-glow {
   animation: soft-pulse 6s infinite ease-in-out;
 }

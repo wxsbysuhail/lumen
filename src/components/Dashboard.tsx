@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { motion, useMotionValue, useTransform, animate } from 'framer-motion';
-import { ArrowUpRight, ArrowDownRight, Plus, Calendar, TrendingUp, Edit2, ChevronDown, Search, Wallet, PiggyBank, Info } from 'lucide-react';
+import { ArrowUpRight, ArrowDownRight, Plus, Calendar, TrendingUp, Edit2, ChevronDown, Search, Wallet, PiggyBank, Info, Camera, Loader2, AlertCircle } from 'lucide-react';
+import { createWorker } from 'tesseract.js';
+import { parseReceiptText } from '../utils/receiptParser';
 
 interface Transaction {
   id: string;
@@ -18,13 +20,21 @@ interface DashboardProps {
   onUpdateGeneralBalance: (newBalance: number) => void;
   goal: string;
   transactions: Transaction[];
-  onAddTransaction: (desc: string, amount: number, type: 'income' | 'expense', category: string) => void;
+  onAddTransaction: (
+    desc: string,
+    amount: number,
+    type: 'income' | 'expense',
+    category: string,
+    splitWithId?: string,
+    splitAmount?: number
+  ) => void;
   savingsRate: number;
   totalBucketSavings?: number;
   holdingsValue?: number;
-  onNavigate?: (tab: 'dashboard' | 'cashflow' | 'savings' | 'investments' | 'projection' | 'reports' | 'insights') => void;
+  onNavigate?: (tab: 'dashboard' | 'cashflow' | 'savings' | 'investments' | 'projection' | 'reports' | 'insights' | 'joint') => void;
   recurringExpenses?: number;
   savingsTargetsSum?: number;
+  partnerProfile?: { id: string; name: string; email: string } | null;
 }
 
 // Custom Motion Count-up Component
@@ -59,12 +69,20 @@ export const Dashboard: React.FC<DashboardProps> = ({
   onNavigate,
   recurringExpenses = 0,
   savingsTargetsSum = 0,
+  partnerProfile = null,
 }) => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [desc, setDesc] = useState('');
   const [amount, setAmount] = useState('');
   const [type, setType] = useState<'income' | 'expense'>('expense');
   const [category, setCategory] = useState('');
+  const [splitWithPartner, setSplitWithPartner] = useState(false);
+
+  useEffect(() => {
+    if (!showAddModal) {
+      setSplitWithPartner(false);
+    }
+  }, [showAddModal]);
 
   // Balance adjust modal states
   const [showAdjustModal, setShowAdjustModal] = useState(false);
@@ -76,6 +94,54 @@ export const Dashboard: React.FC<DashboardProps> = ({
   // Category select dropdown states
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+
+  // OCR Scan States
+  const [isScanning, setIsScanning] = useState(false);
+  const [scanProgress, setScanProgress] = useState(0);
+  const [scanError, setScanError] = useState('');
+
+  const handleReceiptScan = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsScanning(true);
+    setScanProgress(0);
+    setScanError('');
+
+    try {
+      const worker = await createWorker('eng', 1, {
+        logger: m => {
+          if (m.status === 'recognizing text') {
+            setScanProgress(Math.round(m.progress * 100));
+          }
+        }
+      });
+
+      const { data: { text } } = await worker.recognize(file);
+      await worker.terminate();
+
+      if (!text || text.trim() === '') {
+        throw new Error('No readable text detected in receipt.');
+      }
+
+      const parsed = parseReceiptText(text);
+
+      setDesc(parsed.description);
+      if (parsed.amount > 0) {
+        handleCurrencyChange(parsed.amount.toString(), setAmount);
+      } else {
+        setAmount('');
+      }
+      setType('expense');
+      setCategory(parsed.category);
+
+    } catch (err: any) {
+      console.error('OCR Error:', err);
+      setScanError(err.message || 'Scanning failed. Please enter details manually.');
+    } finally {
+      setIsScanning(false);
+    }
+  };
 
   // Helper to format currency user input with commas
   const handleCurrencyChange = (value: string, setter: (val: string) => void) => {
@@ -189,10 +255,17 @@ export const Dashboard: React.FC<DashboardProps> = ({
     e.preventDefault();
     if (!desc || !amount) return;
     const parsedAmount = parseFloat(amount.replace(/,/g, '')) || 0;
-    onAddTransaction(desc, parsedAmount, type, category);
+    
+    if (splitWithPartner && partnerProfile) {
+      onAddTransaction(desc, parsedAmount, type, category, partnerProfile.id, parsedAmount / 2);
+    } else {
+      onAddTransaction(desc, parsedAmount, type, category);
+    }
+    
     setDesc('');
     setAmount('');
     setSearchQuery('');
+    setSplitWithPartner(false);
     setShowAddModal(false);
   };
 
@@ -681,6 +754,74 @@ export const Dashboard: React.FC<DashboardProps> = ({
           >
             <h3 className="serif-title" style={{ fontSize: '1.6rem', marginBottom: 'var(--space-4)' }}>Log Entry</h3>
             
+            {/* Scan Receipt Upload Zone */}
+            <div style={{ marginBottom: 'var(--space-4)' }}>
+              <label 
+                htmlFor="receipt-upload" 
+                style={{ 
+                  display: 'flex', 
+                  flexDirection: 'column',
+                  alignItems: 'center', 
+                  justifyContent: 'center',
+                  gap: 'var(--space-2)',
+                  padding: 'var(--space-4)',
+                  borderRadius: 'var(--radius-md)',
+                  border: '1px dashed var(--border-color)',
+                  backgroundColor: 'var(--bg-color)',
+                  cursor: 'pointer',
+                  transition: 'all var(--transition-fast)',
+                }}
+              >
+                <input
+                  type="file"
+                  id="receipt-upload"
+                  accept="image/*"
+                  onChange={handleReceiptScan}
+                  style={{ display: 'none' }}
+                  disabled={isScanning}
+                />
+                
+                {isScanning ? (
+                  <div className="flex flex-col align-center gap-2 text-center" style={{ width: '100%' }}>
+                    <Loader2 className="animate-spin text-gain" size={20} style={{ color: 'var(--emerald-gains)' }} />
+                    <span style={{ fontSize: '0.8rem', fontWeight: 550 }}>Analyzing receipt ({scanProgress}%)</span>
+                    <div style={{ 
+                      width: '100%', 
+                      height: '4px', 
+                      backgroundColor: 'var(--border-color)', 
+                      borderRadius: '2px',
+                      overflow: 'hidden',
+                      marginTop: '4px'
+                    }}>
+                      <motion.div 
+                        style={{ height: '100%', backgroundColor: 'var(--emerald-gains)', width: `${scanProgress}%` }} 
+                        layout
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex align-center gap-2" style={{ color: 'var(--ink-muted)', fontSize: '0.8rem', fontWeight: 550 }}>
+                    <Camera size={14} />
+                    <span>Scan Receipt (AI Auto-Fill)</span>
+                  </div>
+                )}
+              </label>
+              
+              {scanError && (
+                <div style={{ 
+                  fontSize: '0.75rem', 
+                  color: 'var(--coral-losses)', 
+                  marginTop: 'var(--space-2)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px'
+                }}>
+                  <AlertCircle size={12} />
+                  <span>{scanError}</span>
+                </div>
+              )}
+            </div>
+
             <form onSubmit={handleSubmit} className="flex flex-col gap-4">
               <div className="input-group">
                 <label className="input-label">Type</label>
@@ -898,6 +1039,60 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   </>
                 )}
               </div>
+
+              {partnerProfile && type === 'expense' && (
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: 'var(--space-3) var(--space-4)',
+                  borderRadius: 'var(--radius-md)',
+                  backgroundColor: 'var(--bg-color)',
+                  border: '1px solid var(--border-color)',
+                  marginTop: 'var(--space-2)'
+                }}>
+                  <div style={{ display: 'flex', flexDirection: 'column' }}>
+                    <span style={{ fontSize: '0.85rem', fontWeight: 550, color: 'var(--ink-color)' }}>Split 50/50</span>
+                    <span style={{ fontSize: '0.72rem', color: 'var(--ink-muted)' }}>Split this transaction with {partnerProfile.name}</span>
+                  </div>
+                  <label className="switch" style={{
+                    position: 'relative',
+                    display: 'inline-block',
+                    width: '40px',
+                    height: '22px'
+                  }}>
+                    <input
+                      type="checkbox"
+                      id="splitWithPartner"
+                      checked={splitWithPartner}
+                      onChange={(e) => setSplitWithPartner(e.target.checked)}
+                      style={{ opacity: 0, width: 0, height: 0 }}
+                    />
+                    <span style={{
+                      position: 'absolute',
+                      cursor: 'pointer',
+                      top: 0, left: 0, right: 0, bottom: 0,
+                      backgroundColor: splitWithPartner ? 'var(--emerald-gains)' : 'var(--border-color)',
+                      transition: '.3s',
+                      borderRadius: '22px'
+                    }}>
+                      <span style={{
+                        position: 'absolute',
+                        content: '""',
+                        height: '16px',
+                        width: '16px',
+                        left: '3px',
+                        bottom: '3px',
+                        backgroundColor: '#ffffff',
+                        transition: '.3s',
+                        borderRadius: '50%',
+                        transform: splitWithPartner ? 'translateX(18px)' : 'translateX(0)',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.15)'
+                      }} />
+                    </span>
+                  </label>
+                </div>
+              )}
 
               <div className="flex justify-between" style={{ marginTop: 'var(--space-4)' }}>
                 <button type="button" className="btn btn-secondary" onClick={() => setShowAddModal(false)}>

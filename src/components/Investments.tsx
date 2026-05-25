@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { BookOpen, AlertCircle } from 'lucide-react';
+import { BookOpen, AlertCircle, Globe } from 'lucide-react';
 
 interface Holding {
   ticker: string;
@@ -21,6 +21,11 @@ interface InvestmentsProps {
   generalBalance: number;
   holdings: Holding[];
   onTrade: (ticker: string, shares: number, price: number, type: 'buy' | 'sell') => void;
+  exchangeRates: {
+    USD: number;
+    MUR: number;
+    EUR: number;
+  };
 }
 
 const INITIAL_STOCKS: Stock[] = [
@@ -54,9 +59,13 @@ export const Investments: React.FC<InvestmentsProps> = ({
   generalBalance,
   holdings,
   onTrade,
+  exchangeRates,
 }) => {
   const [stocks, setStocks] = useState<Stock[]>(INITIAL_STOCKS);
   const [activeTickers, setActiveTickers] = useState<Record<string, 'up' | 'down' | null>>({});
+
+  // Display currency state
+  const [displayCurrency, setDisplayCurrency] = useState<'MUR' | 'USD' | 'EUR'>('MUR');
 
   // Buy/Sell modal state
   const [selectedStock, setSelectedStock] = useState<Stock | null>(null);
@@ -98,18 +107,59 @@ export const Investments: React.FC<InvestmentsProps> = ({
     return () => clearInterval(interval);
   }, []);
 
+  // Multi-currency calculation utilities
+  const getStockCurrencyCode = (stock: Stock): 'MUR' | 'USD' | 'EUR' => {
+    return stock.currency === '$' ? 'USD' : 'MUR';
+  };
+
+  const convertAmount = (amount: number, from: 'MUR' | 'USD' | 'EUR', to: 'MUR' | 'USD' | 'EUR') => {
+    if (from === to) return amount;
+    
+    // Convert to USD base first
+    let amountInUsd = amount;
+    if (from === 'MUR') {
+      amountInUsd = amount / exchangeRates.MUR;
+    } else if (from === 'EUR') {
+      amountInUsd = amount / exchangeRates.EUR;
+    }
+    
+    // Convert USD base to target
+    if (to === 'MUR') {
+      return amountInUsd * exchangeRates.MUR;
+    } else if (to === 'EUR') {
+      return amountInUsd * exchangeRates.EUR;
+    }
+    return amountInUsd;
+  };
+
+  const getDisplayPrice = (stock: Stock) => {
+    const stockCurrency = getStockCurrencyCode(stock);
+    return convertAmount(stock.price, stockCurrency, displayCurrency);
+  };
+
+  const getStockMurPrice = (stock: Stock) => {
+    const stockCurrency = getStockCurrencyCode(stock);
+    return convertAmount(stock.price, stockCurrency, 'MUR');
+  };
+
+  const getCurrencySymbol = (curr: 'MUR' | 'USD' | 'EUR') => {
+    if (curr === 'MUR') return 'Rs. ';
+    if (curr === 'USD') return '$';
+    if (curr === 'EUR') return '€';
+    return '';
+  };
+
   const handleTradeSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedStock || !sharesInput) return;
     const shares = parseFloat(sharesInput) || 0;
     if (shares <= 0) return;
 
-    // Convert stock price to MUR (Rs) if it's in USD ($)
-    const usdToMur = 46.5; // Fixed mock exchange rate
-    const priceInMur = selectedStock.currency === '$' ? selectedStock.price * usdToMur : selectedStock.price;
-    const totalCost = shares * priceInMur;
+    // Convert stock price to MUR (Rs) for general ledger
+    const priceInMur = getStockMurPrice(selectedStock);
+    const totalCostMur = shares * priceInMur;
 
-    if (tradeType === 'buy' && totalCost > generalBalance) {
+    if (tradeType === 'buy' && totalCostMur > generalBalance) {
       return;
     }
 
@@ -125,34 +175,36 @@ export const Investments: React.FC<InvestmentsProps> = ({
     setSelectedStock(null);
   };
 
-  // Convert stock price to Rs. for display if USD
-  const getMurPrice = (stock: Stock) => {
-    const usdToMur = 46.5;
-    return stock.currency === '$' ? stock.price * usdToMur : stock.price;
-  };
-
-  const getPortfolioValue = () => {
+  const getPortfolioValueMur = () => {
     return holdings.reduce((acc, holding) => {
       const stock = stocks.find(s => s.ticker === holding.ticker);
       if (!stock) return acc;
-      const currentPriceInMur = getMurPrice(stock);
-      return acc + (holding.shares * currentPriceInMur);
+      return acc + (holding.shares * getStockMurPrice(stock));
     }, 0);
   };
 
-  const getPortfolioCost = () => {
+  const getPortfolioCostMur = () => {
     return holdings.reduce((acc, holding) => acc + (holding.shares * holding.avgPrice), 0);
   };
 
-  const portfolioValue = getPortfolioValue();
-  const portfolioCost = getPortfolioCost();
-  const portfolioReturn = portfolioCost > 0 ? ((portfolioValue - portfolioCost) / portfolioCost) * 100 : 0;
+  // Convert summaries to active displayCurrency
+  const portfolioValueMur = getPortfolioValueMur();
+  const portfolioCostMur = getPortfolioCostMur();
+  const portfolioValueDisplay = convertAmount(portfolioValueMur, 'MUR', displayCurrency);
+  const portfolioCostDisplay = convertAmount(portfolioCostMur, 'MUR', displayCurrency);
+  const portfolioReturnDisplay = portfolioValueDisplay - portfolioCostDisplay;
+  const portfolioReturnRate = portfolioCostMur > 0 ? ((portfolioValueMur - portfolioCostMur) / portfolioCostMur) * 100 : 0;
 
   const shares = parseFloat(sharesInput) || 0;
-  const priceInMur = selectedStock ? getMurPrice(selectedStock) : 0;
-  const totalCost = shares * priceInMur;
+  const priceInDisplay = selectedStock ? getDisplayPrice(selectedStock) : 0;
+  const totalCostDisplay = shares * priceInDisplay;
+  const displayBalance = convertAmount(generalBalance, 'MUR', displayCurrency);
   const currentHolding = selectedStock ? holdings.find(h => h.ticker === selectedStock.ticker) : null;
-  const isOverdraft = selectedStock ? (tradeType === 'buy' && totalCost > generalBalance) : false;
+  
+  // Overdraft verification in MUR to be perfectly consistent with ledger
+  const priceInMur = selectedStock ? getStockMurPrice(selectedStock) : 0;
+  const totalCostMur = shares * priceInMur;
+  const isOverdraft = selectedStock ? (tradeType === 'buy' && totalCostMur > generalBalance) : false;
   const isInsuffShares = selectedStock ? (tradeType === 'sell' && (!currentHolding || currentHolding.shares < shares)) : false;
   const hasError = isOverdraft || isInsuffShares;
 
@@ -164,11 +216,38 @@ export const Investments: React.FC<InvestmentsProps> = ({
       transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
       className="flex flex-col gap-8"
     >
-      <div className="flex flex-col gap-2">
-        <h1 className="serif-title" style={{ fontSize: '2.5rem', fontWeight: 400, fontStyle: 'italic' }}>Investments & Assets</h1>
-        <p style={{ color: 'var(--ink-muted)' }}>
-          Track real-time stock simulations, log portfolio purchase/sales, and read principles.
-        </p>
+      <div className="flex justify-between align-end gap-4" style={{ flexWrap: 'wrap' }}>
+        <div className="flex flex-col gap-2">
+          <h1 className="serif-title" style={{ fontSize: '2.5rem', fontWeight: 400, fontStyle: 'italic' }}>Investments & Assets</h1>
+          <p style={{ color: 'var(--ink-muted)' }}>
+            Track real-time stock simulations, log portfolio purchase/sales, and read principles.
+          </p>
+        </div>
+
+        {/* Dynamic Currency Switcher */}
+        <div className="flex align-center gap-2" style={{ marginBottom: '4px' }}>
+          <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--ink-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Display Base</span>
+          <div className="segmented-control" style={{ width: 'auto', display: 'inline-flex' }}>
+            {(['MUR', 'USD', 'EUR'] as const).map((curr) => (
+              <button
+                key={curr}
+                type="button"
+                className={`segment-btn ${displayCurrency === curr ? 'active' : ''}`}
+                style={{ padding: '4px 12px', fontSize: '0.78rem', minWidth: '50px' }}
+                onClick={() => setDisplayCurrency(curr)}
+              >
+                {displayCurrency === curr && (
+                  <motion.div
+                    layoutId="activeCurrencyBg"
+                    className="active-indicator"
+                    transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+                  />
+                )}
+                <span>{curr}</span>
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
 
       {/* Portfolio Value Summary Card */}
@@ -176,20 +255,20 @@ export const Investments: React.FC<InvestmentsProps> = ({
         <div className="flex flex-col gap-1" style={{ borderRight: '1px solid var(--border-color)', paddingRight: 'var(--space-4)' }}>
           <span style={{ fontSize: '0.8rem', color: 'var(--ink-muted)', fontWeight: 600, textTransform: 'uppercase' }}>Assets Valuation</span>
           <h2 className="num" style={{ fontSize: '1.8rem', fontWeight: 550 }}>
-            Rs. {portfolioValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            {getCurrencySymbol(displayCurrency)}{portfolioValueDisplay.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </h2>
         </div>
         <div className="flex flex-col gap-1" style={{ borderRight: '1px solid var(--border-color)', paddingRight: 'var(--space-4)', paddingLeft: 'var(--space-2)' }}>
           <span style={{ fontSize: '0.8rem', color: 'var(--ink-muted)', fontWeight: 600, textTransform: 'uppercase' }}>All-Time Returns</span>
-          <h2 className={`num ${portfolioValue >= portfolioCost ? 'text-gain' : 'text-loss'}`} style={{ fontSize: '1.8rem', fontWeight: 550 }}>
-            {portfolioValue >= portfolioCost ? '+' : ''}Rs. {(portfolioValue - portfolioCost).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          <h2 className={`num ${portfolioReturnDisplay >= 0 ? 'text-gain' : 'text-loss'}`} style={{ fontSize: '1.8rem', fontWeight: 550 }}>
+            {portfolioReturnDisplay >= 0 ? '+' : ''}{getCurrencySymbol(displayCurrency)}{portfolioReturnDisplay.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </h2>
         </div>
         <div className="flex flex-col gap-1" style={{ paddingLeft: 'var(--space-2)' }}>
           <span style={{ fontSize: '0.8rem', color: 'var(--ink-muted)', fontWeight: 600, textTransform: 'uppercase' }}>Return rate %</span>
           <div className="flex align-center gap-2" style={{ marginTop: '2px' }}>
-            <span className={`num ${portfolioReturn >= 0 ? 'text-gain' : 'text-loss'}`} style={{ fontSize: '1.8rem', fontWeight: 550 }}>
-              {portfolioReturn >= 0 ? '+' : ''}{portfolioReturn.toFixed(2)}%
+            <span className={`num ${portfolioReturnRate >= 0 ? 'text-gain' : 'text-loss'}`} style={{ fontSize: '1.8rem', fontWeight: 550 }}>
+              {portfolioReturnRate >= 0 ? '+' : ''}{portfolioReturnRate.toFixed(2)}%
             </span>
           </div>
         </div>
@@ -198,11 +277,26 @@ export const Investments: React.FC<InvestmentsProps> = ({
       <div className="grid grid-2 gap-6">
         {/* Watchlist Section */}
         <div className="card flex flex-col gap-4">
-          <div className="card-title">Live Asset Simulation</div>
+          <div className="flex justify-between align-center" style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: 'var(--space-2)' }}>
+            <div className="card-title" style={{ margin: 0 }}>Live Asset Simulation</div>
+            <div className="flex align-center gap-2" style={{
+              fontSize: '0.72rem',
+              color: 'var(--ink-muted)',
+              background: 'var(--nav-pill-bg)',
+              padding: '3px 8px',
+              borderRadius: '12px',
+              border: '1px solid var(--border-color)',
+              display: 'flex',
+            }}>
+              <Globe size={11} />
+              <span>1 USD = Rs. {exchangeRates.MUR.toFixed(2)}</span>
+            </div>
+          </div>
           <div className="flex flex-col gap-3">
             {stocks.map((stock) => {
               const tickState = activeTickers[stock.ticker];
-              const isUSD = stock.currency === '$';
+              const displayPrice = getDisplayPrice(stock);
+              const isAlternativeCurrency = displayCurrency !== getStockCurrencyCode(stock);
               
               return (
                 <div
@@ -228,11 +322,11 @@ export const Investments: React.FC<InvestmentsProps> = ({
                   <div className="flex align-center gap-4">
                     <div style={{ textAlign: 'right' }}>
                       <div className="num" style={{ fontWeight: 600, fontSize: '0.95rem' }}>
-                        {stock.currency}{stock.price.toFixed(2)}
+                        {getCurrencySymbol(displayCurrency)}{displayPrice.toFixed(2)}
                       </div>
-                      {isUSD && (
+                      {isAlternativeCurrency && (
                         <div className="num" style={{ fontSize: '0.72rem', color: 'var(--ink-muted)' }}>
-                          Rs. {getMurPrice(stock).toLocaleString('en-US', { maximumFractionDigits: 1 })}
+                          Original: {stock.currency}{stock.price.toFixed(2)}
                         </div>
                       )}
                     </div>
@@ -272,10 +366,14 @@ export const Investments: React.FC<InvestmentsProps> = ({
               {holdings.map((holding) => {
                 const stock = stocks.find(s => s.ticker === holding.ticker);
                 if (!stock) return null;
-                const currentPrice = getMurPrice(stock);
-                const holdingValue = holding.shares * currentPrice;
-                const holdingCost = holding.shares * holding.avgPrice;
-                const holdingReturn = ((holdingValue - holdingCost) / holdingCost) * 100;
+                
+                const stockMurPrice = getStockMurPrice(stock);
+                const holdingValueMur = holding.shares * stockMurPrice;
+                const holdingCostMur = holding.shares * holding.avgPrice;
+                const holdingReturnRate = holdingCostMur > 0 ? ((holdingValueMur - holdingCostMur) / holdingCostMur) * 100 : 0;
+                
+                const holdingValueDisplay = convertAmount(holdingValueMur, 'MUR', displayCurrency);
+                const holdingAvgPriceDisplay = convertAmount(holding.avgPrice, 'MUR', displayCurrency);
 
                 return (
                   <div key={holding.ticker} className="flex justify-between align-center" style={{
@@ -285,16 +383,16 @@ export const Investments: React.FC<InvestmentsProps> = ({
                     <div className="flex flex-col">
                       <span style={{ fontWeight: 650, fontSize: '0.95rem' }}>{holding.ticker}</span>
                       <span style={{ fontSize: '0.75rem', color: 'var(--ink-light)' }}>
-                        {holding.shares} Shares @ Avg Rs. {holding.avgPrice.toFixed(1)}
+                        {holding.shares} Shares @ Avg {getCurrencySymbol(displayCurrency)}{holdingAvgPriceDisplay.toFixed(1)}
                       </span>
                     </div>
 
                     <div style={{ textAlign: 'right' }}>
                       <div className="num" style={{ fontWeight: 600 }}>
-                        Rs. {holdingValue.toLocaleString('en-US', { maximumFractionDigits: 1 })}
+                        {getCurrencySymbol(displayCurrency)}{holdingValueDisplay.toLocaleString('en-US', { maximumFractionDigits: 1 })}
                       </div>
-                      <div className={`num ${holdingReturn >= 0 ? 'text-gain' : 'text-loss'}`} style={{ fontSize: '0.75rem' }}>
-                        {holdingReturn >= 0 ? '+' : ''}{holdingReturn.toFixed(2)}%
+                      <div className={`num ${holdingReturnRate >= 0 ? 'text-gain' : 'text-loss'}`} style={{ fontSize: '0.75rem' }}>
+                        {holdingReturnRate >= 0 ? '+' : ''}{holdingReturnRate.toFixed(2)}%
                       </div>
                     </div>
                   </div>
@@ -345,16 +443,17 @@ export const Investments: React.FC<InvestmentsProps> = ({
             style={{
               width: '100%',
               maxWidth: '400px',
-              backgroundColor: '#FFFFFF',
-              boxShadow: '0 20px 40px rgba(0,0,0,0.06)',
+              backgroundColor: 'var(--card-bg)',
+              border: '1px solid var(--border-color)',
+              boxShadow: '0 20px 40px rgba(0,0,0,0.12)',
             }}
           >
             <h3 className="serif-title" style={{ fontSize: '1.6rem', marginBottom: 'var(--space-2)' }}>
               Trade {selectedStock.ticker}
             </h3>
             <p style={{ fontSize: '0.85rem', color: 'var(--ink-muted)', marginBottom: 'var(--space-4)' }}>
-              Current Price: {selectedStock.currency}{selectedStock.price.toFixed(2)} 
-              {selectedStock.currency === '$' && ` (~Rs. ${getMurPrice(selectedStock).toFixed(1)})`}
+              Current Price: {getCurrencySymbol(displayCurrency)}{priceInDisplay.toFixed(2)} 
+              {displayCurrency !== getStockCurrencyCode(selectedStock) && ` (${selectedStock.currency}${selectedStock.price.toFixed(2)})`}
             </p>
 
             <form onSubmit={handleTradeSubmit} className="flex flex-col gap-4">
@@ -366,7 +465,7 @@ export const Investments: React.FC<InvestmentsProps> = ({
                     className="btn"
                     style={{
                       flex: 1,
-                      backgroundColor: tradeType === 'buy' ? 'var(--ink-color)' : 'var(--bg-color)',
+                      backgroundColor: tradeType === 'buy' ? 'var(--ink-color)' : 'var(--nav-pill-bg)',
                       color: tradeType === 'buy' ? 'var(--bg-color)' : 'var(--ink-color)',
                       border: '1px solid var(--border-color)',
                       fontSize: '0.85rem',
@@ -381,7 +480,7 @@ export const Investments: React.FC<InvestmentsProps> = ({
                     className="btn"
                     style={{
                       flex: 1,
-                      backgroundColor: tradeType === 'sell' ? 'var(--ink-color)' : 'var(--bg-color)',
+                      backgroundColor: tradeType === 'sell' ? 'var(--ink-color)' : 'var(--nav-pill-bg)',
                       color: tradeType === 'sell' ? 'var(--bg-color)' : 'var(--ink-color)',
                       border: '1px solid var(--border-color)',
                       fontSize: '0.85rem',
@@ -402,6 +501,11 @@ export const Investments: React.FC<InvestmentsProps> = ({
                   value={sharesInput}
                   onChange={(e) => setSharesInput(e.target.value.replace(/[^0-9.]/g, ''))}
                   className="input-field num-input"
+                  style={{
+                    backgroundColor: 'var(--bg-color)',
+                    color: 'var(--ink-color)',
+                    border: '1px solid var(--border-color)',
+                  }}
                   required
                   autoFocus
                 />
@@ -411,12 +515,15 @@ export const Investments: React.FC<InvestmentsProps> = ({
                 <div className="flex justify-between">
                   <span style={{ color: 'var(--ink-muted)' }}>Estimated Value</span>
                   <span className="num" style={{ fontWeight: 600 }}>
-                    Rs. {((parseFloat(sharesInput) || 0) * getMurPrice(selectedStock)).toLocaleString('en-US', { maximumFractionDigits: 1 })}
+                    {getCurrencySymbol(displayCurrency)}{totalCostDisplay.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span style={{ color: 'var(--ink-muted)' }}>Cash Balance</span>
-                  <span className="num" style={{ fontWeight: 600 }}>Rs. {generalBalance.toLocaleString()}</span>
+                  <span className="num" style={{ fontWeight: 600 }}>
+                    {getCurrencySymbol(displayCurrency)}{displayBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    {displayCurrency !== 'MUR' && ` (~Rs. ${generalBalance.toLocaleString()})`}
+                  </span>
                 </div>
               </div>
 
@@ -425,11 +532,11 @@ export const Investments: React.FC<InvestmentsProps> = ({
                   display: 'flex',
                   alignItems: 'center',
                   gap: '8px',
-                  backgroundColor: 'rgba(232, 93, 93, 0.08)',
+                  backgroundColor: 'var(--coral-losses-bg)',
                   border: '1px solid rgba(232, 93, 93, 0.2)',
                   padding: '12px',
                   borderRadius: '8px',
-                  color: 'rgb(220, 38, 38)',
+                  color: 'var(--coral-losses)',
                   fontSize: '0.85rem',
                   marginTop: 'var(--space-2)'
                 }}>

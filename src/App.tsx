@@ -8,6 +8,8 @@ import { Investments } from './components/Investments';
 import { WealthProjection } from './components/WealthProjection';
 import { Insights } from './components/Insights';
 import { Reports } from './components/Reports';
+import { JointSync } from './components/JointSync';
+import { AICoach } from './components/AICoach';
 import { Login } from './components/Login';
 import { supabase } from './supabaseClient';
 
@@ -26,6 +28,8 @@ import {
   Download,
   Sun,
   Moon,
+  Users,
+  Bot,
 } from 'lucide-react';
 
 interface Transaction {
@@ -35,6 +39,10 @@ interface Transaction {
   type: 'income' | 'expense';
   category: string;
   date: string;
+  split_with_id?: string;
+  split_amount?: number;
+  split_settled?: boolean;
+  user_id?: string;
 }
 
 interface RecurringItem {
@@ -119,8 +127,46 @@ function App() {
   // Investment holdings
   const [holdings, setHoldings] = useState<Holding[]>([]);
 
+  // Exchange Rates State
+  const [exchangeRates, setExchangeRates] = useState<{
+    USD: number;
+    MUR: number;
+    EUR: number;
+  }>({
+    USD: 1.0,
+    MUR: 46.50,
+    EUR: 0.92,
+  });
+
+  // Fetch Live Rates
+  useEffect(() => {
+    fetch('https://open.er-api.com/v6/latest/USD')
+      .then(res => {
+        if (!res.ok) throw new Error('API load error');
+        return res.json();
+      })
+      .then(data => {
+        if (data && data.rates && data.rates.MUR && data.rates.EUR) {
+          setExchangeRates({
+            USD: 1.0,
+            MUR: parseFloat(data.rates.MUR),
+            EUR: parseFloat(data.rates.EUR),
+          });
+        }
+      })
+      .catch(err => {
+        console.warn('Live exchange rates lookup failed, using local fallbacks:', err);
+      });
+  }, []);
+
+  // Joint Sync States
+  const [partnerProfile, setPartnerProfile] = useState<any>(null);
+  const [jointLink, setJointLink] = useState<any>(null);
+  const [incomingInvite, setIncomingInvite] = useState<any>(null);
+  const [outgoingInvite, setOutgoingInvite] = useState<any>(null);
+
   // Navigation
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'cashflow' | 'savings' | 'investments' | 'projection' | 'reports' | 'insights'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'cashflow' | 'savings' | 'investments' | 'projection' | 'reports' | 'insights' | 'joint' | 'assistant'>('dashboard');
   const [showMoreHub, setShowMoreHub] = useState(false);
   const [hideNav, setHideNav] = useState(false);
 
@@ -167,7 +213,7 @@ function App() {
     }
   };
 
-  const isSecondaryTabActive = ['projection', 'reports', 'insights'].includes(activeTab);
+  const isSecondaryTabActive = ['projection', 'reports', 'insights', 'joint'].includes(activeTab);
   const isMoreActive = isSecondaryTabActive || showMoreHub;
 
   const navigateTo = (tab: typeof activeTab) => {
@@ -448,76 +494,273 @@ function App() {
         console.error('Error loading profile:', profileError);
       }
 
-      if (profile?.onboarding_completed) {
-        setProfileName(profile.name);
-        setProfileAvatar(profile.avatar_url || '🚀');
-        setMonthlyIncome(Number(profile.monthly_income));
-        setGeneralBalance(Number(profile.current_balance));
-        setPrimaryGoal(profile.primary_goal || 'save');
-        setIsOnboarded(true);
-
-        // Load details in parallel
-        const [txRes, recRes, bucketRes, holdingRes] = await Promise.all([
-          supabase.from('transactions').select('*').eq('user_id', userId).order('date', { ascending: false }),
-          supabase.from('recurring_items').select('*').eq('user_id', userId),
-          supabase.from('savings_buckets').select('*').eq('user_id', userId),
-          supabase.from('holdings').select('*').eq('user_id', userId),
-        ]);
-
-        if (txRes.data) {
-          setTransactions(txRes.data.map((tx: any) => ({
-            id: tx.id,
-            description: tx.description,
-            amount: Number(tx.amount),
-            type: tx.type,
-            category: tx.category,
-            date: tx.date,
-          })));
+      if (profile) {
+        // Sync user email in profiles if missing
+        if (!profile.email && session?.user?.email) {
+          await supabase
+            .from('profiles')
+            .update({ email: session.user.email })
+            .eq('id', userId);
+          profile.email = session.user.email;
         }
 
-        if (recRes.data) {
-          const items = recRes.data.map((item: any) => ({
-            id: item.id,
-            description: item.description,
-            amount: Number(item.amount),
-            type: item.type,
-            category: item.category,
-          }));
-          setRecurringIncomeItems(items.filter((i: any) => i.type === 'income'));
-          setRecurringExpenseItems(items.filter((i: any) => i.type === 'expense'));
-        }
+        // Fetch joint links status
+        const { data: linkData } = await supabase
+          .from('joint_links')
+          .select(`
+            *,
+            inviter:inviter_id(id, name, avatar_url, email),
+            invitee:invitee_id(id, name, avatar_url, email)
+          `)
+          .or(`inviter_id.eq.${userId},invitee_id.eq.${userId}`);
 
-        if (bucketRes.data) {
-          setBuckets(bucketRes.data.map((b: any) => ({
-            id: b.id,
-            name: b.name,
-            target: Number(b.target),
-            current: Number(b.current),
-            monthlyContribution: Number(b.monthly_contribution),
-            priority: b.priority as any || 'medium',
-          })));
-        }
+        let partnerId = null;
+        let incoming = null;
+        let outgoing = null;
 
-        if (holdingRes.data) {
-          setHoldings(holdingRes.data.map((h: any) => ({
-            ticker: h.ticker,
-            shares: Number(h.shares),
-            avgPrice: Number(h.avg_price),
-          })));
+        if (linkData) {
+          const accepted = linkData.find(l => l.status === 'accepted');
+          if (accepted) {
+            const partner = accepted.inviter_id === userId ? accepted.invitee : accepted.inviter;
+            partnerId = partner.id;
+            setPartnerProfile(partner);
+            setJointLink(accepted);
+          } else {
+            setPartnerProfile(null);
+            setJointLink(null);
+            const pendingIncoming = linkData.find(l => l.invitee_id === userId && l.status === 'pending');
+            if (pendingIncoming) incoming = pendingIncoming;
+            const pendingOutgoing = linkData.find(l => l.inviter_id === userId && l.status === 'pending');
+            if (pendingOutgoing) outgoing = pendingOutgoing;
+          }
+        } else {
+          setPartnerProfile(null);
+          setJointLink(null);
         }
+        setIncomingInvite(incoming);
+        setOutgoingInvite(outgoing);
 
-        // Apply automated monthly salary and allowance deposits on the 26th
-        if (recRes.data) {
-          await checkAndApplyRecurringIncomes(profile, recRes.data, userId);
+        if (profile.onboarding_completed) {
+          setProfileName(profile.name);
+          setProfileAvatar(profile.avatar_url || '🚀');
+          setMonthlyIncome(Number(profile.monthly_income));
+          setGeneralBalance(Number(profile.current_balance));
+          setPrimaryGoal(profile.primary_goal || 'save');
+          setIsOnboarded(true);
+
+          // Load details: if joint, fetch both user's records
+          const queryUserId = partnerId ? `user_id.eq.${userId},user_id.eq.${partnerId}` : `user_id.eq.${userId}`;
+
+          const [txRes, recRes, bucketRes, holdingRes] = await Promise.all([
+            supabase.from('transactions').select('*').or(queryUserId).order('date', { ascending: false }),
+            supabase.from('recurring_items').select('*').or(queryUserId),
+            supabase.from('savings_buckets').select('*').or(queryUserId),
+            supabase.from('holdings').select('*').eq('user_id', userId), // Holdings remain individual
+          ]);
+
+          if (txRes.data) {
+            setTransactions(txRes.data.map((tx: any) => ({
+              id: tx.id,
+              description: tx.description,
+              amount: Number(tx.amount),
+              type: tx.type,
+              category: tx.category,
+              date: tx.date,
+              split_with_id: tx.split_with_id,
+              split_amount: tx.split_amount ? Number(tx.split_amount) : undefined,
+              split_settled: tx.split_settled,
+              user_id: tx.user_id,
+            })));
+          }
+
+          if (recRes.data) {
+            const items = recRes.data.map((item: any) => ({
+              id: item.id,
+              description: item.description,
+              amount: Number(item.amount),
+              type: item.type,
+              category: item.category,
+              user_id: item.user_id,
+            }));
+            
+            // Display current user's recurring items only
+            const myItems = items.filter((i: any) => i.user_id === userId);
+            setRecurringIncomeItems(myItems.filter((i: any) => i.type === 'income'));
+            setRecurringExpenseItems(myItems.filter((i: any) => i.type === 'expense'));
+          }
+
+          if (bucketRes.data) {
+            setBuckets(bucketRes.data.map((b: any) => ({
+              id: b.id,
+              name: b.name,
+              target: Number(b.target),
+              current: Number(b.current),
+              monthlyContribution: Number(b.monthly_contribution),
+              priority: b.priority as any || 'medium',
+              user_id: b.user_id,
+            })));
+          }
+
+          if (holdingRes.data) {
+            setHoldings(holdingRes.data.map((h: any) => ({
+              ticker: h.ticker,
+              shares: Number(h.shares),
+              avgPrice: Number(h.avg_price),
+            })));
+          }
+
+          // Apply automated monthly salary and allowance deposits on the 26th
+          if (recRes.data) {
+            const myRecItems = recRes.data.filter((item: any) => item.user_id === userId);
+            await checkAndApplyRecurringIncomes(profile, myRecItems, userId);
+          }
+        } else {
+          setIsOnboarded(false);
         }
-      } else {
-        setIsOnboarded(false);
       }
     } catch (err) {
       console.error('Error fetching user tables:', err);
     } finally {
       setAuthLoading(false);
     }
+  };
+
+  // Joint Sync Callbacks
+  const handleInvitePartner = async (email: string) => {
+    if (!session?.user) return;
+    const userId = session.user.id;
+
+    const { data: matchedProfiles, error: profileErr } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('email', email);
+
+    if (profileErr) throw profileErr;
+    if (!matchedProfiles || matchedProfiles.length === 0) {
+      throw new Error(`No user profile found for "${email}". Make sure your partner has signed up for Lumen and completed onboarding.`);
+    }
+
+    const targetProfile = matchedProfiles[0];
+    
+    const { error: inviteErr } = await supabase
+      .from('joint_links')
+      .insert({
+        inviter_id: userId,
+        invitee_id: targetProfile.id,
+        status: 'pending'
+      });
+
+    if (inviteErr) {
+      if (inviteErr.code === '23505') {
+        throw new Error("An invitation is already pending or active with this user.");
+      }
+      throw inviteErr;
+    }
+
+    await loadUserData(userId);
+  };
+
+  const handleAcceptInvite = async (inviteId: string) => {
+    if (!session?.user) return;
+    const userId = session.user.id;
+
+    const { error } = await supabase
+      .from('joint_links')
+      .update({ status: 'accepted' })
+      .eq('id', inviteId);
+
+    if (error) throw error;
+
+    await loadUserData(userId);
+  };
+
+  const handleDeclineInvite = async (inviteId: string) => {
+    if (!session?.user) return;
+    const userId = session.user.id;
+
+    const { error } = await supabase
+      .from('joint_links')
+      .delete()
+      .eq('id', inviteId);
+
+    if (error) throw error;
+
+    setPartnerProfile(null);
+    setJointLink(null);
+    setIncomingInvite(null);
+    setOutgoingInvite(null);
+
+    await loadUserData(userId);
+  };
+
+  const handleUnlinkPartner = async (linkId: string) => {
+    if (!session?.user) return;
+    const userId = session.user.id;
+
+    const { error } = await supabase
+      .from('joint_links')
+      .delete()
+      .eq('id', linkId);
+
+    if (error) throw error;
+
+    setPartnerProfile(null);
+    setJointLink(null);
+    setIncomingInvite(null);
+    setOutgoingInvite(null);
+
+    await loadUserData(userId);
+  };
+
+  const handleSettleDebt = async () => {
+    if (!session?.user || !partnerProfile) return;
+    const userId = session.user.id;
+    const partnerId = partnerProfile.id;
+
+    const unsettledSplits = transactions.filter(t => 
+      t.split_with_id && 
+      !t.split_settled &&
+      ((t.user_id === userId && t.split_with_id === partnerId) || 
+       (t.user_id === partnerId && t.split_with_id === userId))
+    );
+
+    let partnerOwesMe = 0;
+    let iOwePartner = 0;
+
+    unsettledSplits.forEach(t => {
+      const splitVal = Number(t.split_amount) || (Number(t.amount) / 2);
+      if (t.user_id === userId) {
+        partnerOwesMe += splitVal;
+      } else {
+        iOwePartner += splitVal;
+      }
+    });
+
+    const netDebt = partnerOwesMe - iOwePartner;
+    if (netDebt === 0) return;
+
+    // Mark as settled in db
+    const { error: updateError } = await supabase
+      .from('transactions')
+      .update({ split_settled: true })
+      .or(`user_id.eq.${userId},user_id.eq.${partnerId}`)
+      .not('split_with_id', 'is', null)
+      .eq('split_settled', false);
+
+    if (updateError) throw updateError;
+
+    // Log settlement transaction to sync balances
+    const absDebt = Math.abs(netDebt);
+    const type = netDebt > 0 ? 'income' : 'expense';
+    
+    await handleAddTransaction(
+      `Couple Settlement: ${partnerProfile.name}`,
+      absDebt,
+      type,
+      'Investments'
+    );
+
+    await loadUserData(userId);
   };
 
   const handleOnboardingComplete = async (data: {
@@ -580,7 +823,7 @@ function App() {
     }
   };
 
-  const handleAddTransaction = async (desc: string, amount: number, type: 'income' | 'expense', category: string) => {
+  const handleAddTransaction = async (desc: string, amount: number, type: 'income' | 'expense', category: string, splitWithId?: string, splitAmount?: number) => {
     if (!session?.user) return;
     try {
       const newTx = {
@@ -590,6 +833,9 @@ function App() {
         type,
         category,
         date: new Date().toISOString(),
+        split_with_id: splitWithId || null,
+        split_amount: splitAmount || null,
+        split_settled: false,
       };
 
       const { data: txData, error: txError } = await supabase
@@ -605,6 +851,10 @@ function App() {
         type: txData[0].type,
         category: txData[0].category,
         date: txData[0].date,
+        split_with_id: txData[0].split_with_id,
+        split_amount: txData[0].split_amount ? Number(txData[0].split_amount) : undefined,
+        split_settled: txData[0].split_settled,
+        user_id: txData[0].user_id,
       };
 
       setTransactions(prev => [insertedTx, ...prev]);
@@ -1186,6 +1436,7 @@ function App() {
                   onNavigate={navigateTo}
                   recurringExpenses={activeOutflowSum}
                   savingsTargetsSum={savingsTargetsSum}
+                  partnerProfile={partnerProfile}
                 />
               )}
 
@@ -1220,6 +1471,24 @@ function App() {
                   generalBalance={generalBalance}
                   holdings={holdings}
                   onTrade={handleTrade}
+                  exchangeRates={exchangeRates}
+                />
+              )}
+
+              {activeTab === 'joint' && (
+                <JointSync
+                  key="joint"
+                  session={session}
+                  partnerProfile={partnerProfile}
+                  jointLink={jointLink}
+                  incomingInvite={incomingInvite}
+                  outgoingInvite={outgoingInvite}
+                  transactions={transactions}
+                  onInvite={handleInvitePartner}
+                  onAcceptInvite={handleAcceptInvite}
+                  onDeclineInvite={handleDeclineInvite}
+                  onUnlink={handleUnlinkPartner}
+                  onSettleDebt={handleSettleDebt}
                 />
               )}
 
@@ -1249,6 +1518,18 @@ function App() {
                   monthlyIncome={activeInflowSum || monthlyIncome}
                   totalExpenses={activeOutflowSum}
                   holdingsCount={holdings.length}
+                />
+              )}
+
+              {activeTab === 'assistant' && (
+                <AICoach
+                  key="assistant"
+                  balance={totalNetWorth}
+                  monthlyIncome={activeInflowSum || monthlyIncome}
+                  totalExpenses={activeOutflowSum}
+                  savingsTargetsSum={savingsTargetsSum}
+                  transactions={transactions}
+                  partnerProfile={partnerProfile}
                 />
               )}
             </AnimatePresence>
@@ -1412,6 +1693,32 @@ function App() {
                         <div className="hub-card-text">
                           <div className="hub-card-name">Financial Insights</div>
                           <div className="hub-card-desc">Automated rules of thumb and customized optimization tips.</div>
+                        </div>
+                      </button>
+
+                      <button
+                        className={`hub-card ${activeTab === 'joint' ? 'active' : ''}`}
+                        onClick={() => navigateTo('joint')}
+                      >
+                        <div className="hub-card-icon-wrapper">
+                          <Users size={20} />
+                        </div>
+                        <div className="hub-card-text">
+                          <div className="hub-card-name">Joint Sync & Splits</div>
+                          <div className="hub-card-desc">Link with a partner, split expenses, and settle debts.</div>
+                        </div>
+                      </button>
+
+                      <button
+                        className={`hub-card ${activeTab === 'assistant' ? 'active' : ''}`}
+                        onClick={() => navigateTo('assistant')}
+                      >
+                        <div className="hub-card-icon-wrapper" style={{ color: 'var(--emerald-gains)', backgroundColor: 'var(--emerald-gains-bg)' }}>
+                          <Bot size={20} />
+                        </div>
+                        <div className="hub-card-text">
+                          <div className="hub-card-name">AI Financial Coach</div>
+                          <div className="hub-card-desc">Ask questions, analyze budget context, and get wealth advice.</div>
                         </div>
                       </button>
                     </div>
