@@ -1127,36 +1127,15 @@ function App() {
                 {/* Theme Switcher Toggle */}
                 <button
                   type="button"
+                  className="theme-toggle-btn"
                   onClick={() => setTheme(prev => prev === 'light' ? 'dark' : 'light')}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    width: '32px',
-                    height: '32px',
-                    borderRadius: '50%',
-                    background: 'rgba(128,128,128,0.08)',
-                    border: '1px solid var(--border-color)',
-                    color: 'var(--ink-color)',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s',
-                  }}
                   title={`Switch to ${theme === 'light' ? 'Dark' : 'Light'} Mode`}
                 >
                   {theme === 'light' ? <Moon size={15} /> : <Sun size={15} />}
                 </button>
 
                 {/* Avatar + first name */}
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  padding: '3px 10px 3px 3px',
-                  borderRadius: '20px',
-                  background: 'rgba(10,10,10,0.03)',
-                  border: '1px solid var(--border-color)',
-                  flexShrink: 0,
-                }}>
+                <div className="profile-chip">
                   <div style={{
                     width: '26px',
                     height: '26px',
