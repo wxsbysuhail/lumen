@@ -250,24 +250,25 @@ export const WealthProjection: React.FC<WealthProjectionProps> = ({
           {hoverIndex !== null && (
             <div style={{
               position: 'absolute',
-              top: `${hoverPos.y - 70}px`,
+              top: `${hoverPos.y - 76}px`,
               left: `${hoverPos.x}px`,
               transform: 'translateX(-50%)',
-              backgroundColor: 'var(--ink-color)',
-              color: 'var(--bg-color)',
+              backgroundColor: 'var(--card-bg)',
+              color: 'var(--ink-color)',
+              border: '1px solid var(--border-color)',
               padding: '6px 12px',
               borderRadius: 'var(--radius-md)',
               fontSize: '0.8rem',
               pointerEvents: 'none',
-              boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+              boxShadow: '0 8px 16px rgba(0,0,0,0.06)',
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
               whiteSpace: 'nowrap',
               zIndex: 10,
             }}>
-              <span style={{ opacity: 0.75 }}>Year {points[hoverIndex].year}</span>
-              <span className="num" style={{ fontWeight: 650 }}>
+              <span style={{ fontSize: '0.7rem', color: 'var(--ink-muted)', fontWeight: 550 }}>Year {points[hoverIndex].year}</span>
+              <span className="num" style={{ fontWeight: 700, color: 'var(--ink-color)', marginTop: '2px' }}>
                 Rs. {points[hoverIndex].balance.toLocaleString()}
               </span>
             </div>

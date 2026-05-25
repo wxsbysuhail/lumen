@@ -24,6 +24,8 @@ import {
   Grid,
   X,
   Download,
+  Sun,
+  Moon,
 } from 'lucide-react';
 
 interface Transaction {
@@ -121,6 +123,14 @@ function App() {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'cashflow' | 'savings' | 'investments' | 'projection' | 'reports' | 'insights'>('dashboard');
   const [showMoreHub, setShowMoreHub] = useState(false);
   const [hideNav, setHideNav] = useState(false);
+
+  // Theme state
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => (localStorage.getItem('lumen-theme') as 'light' | 'dark') || 'light');
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('lumen-theme', theme);
+  }, [theme]);
 
   // PWA Installation Prompts States
   const [showIOSPrompt, setShowIOSPrompt] = useState(false);
@@ -1114,6 +1124,28 @@ function App() {
 
               {/* User profile chip & action icons */}
               <div className="flex align-center gap-2" style={{ flex: 1, justifyContent: 'flex-end' }}>
+                {/* Theme Switcher Toggle */}
+                <button
+                  type="button"
+                  onClick={() => setTheme(prev => prev === 'light' ? 'dark' : 'light')}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: '32px',
+                    height: '32px',
+                    borderRadius: '50%',
+                    background: 'rgba(128,128,128,0.08)',
+                    border: '1px solid var(--border-color)',
+                    color: 'var(--ink-color)',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                  }}
+                  title={`Switch to ${theme === 'light' ? 'Dark' : 'Light'} Mode`}
+                >
+                  {theme === 'light' ? <Moon size={15} /> : <Sun size={15} />}
+                </button>
+
                 {/* Avatar + first name */}
                 <div style={{
                   display: 'flex',

@@ -44,6 +44,28 @@
   --transition-normal: 0.4s var(--ease-slow);
 }
 
+[data-theme="dark"] {
+  --bg-color: #0C0C0B;
+  --ink-color: #F7F7F2;
+  --ink-muted: #A3A39C;
+  --ink-light: #73736C;
+  --border-color: rgba(247, 247, 242, 0.12);
+  --border-hover: rgba(247, 247, 242, 0.22);
+  --border-focus: rgba(247, 247, 242, 0.4);
+  
+  --emerald-gains: #10B981;
+  --emerald-gains-bg: rgba(16, 185, 129, 0.08);
+  --coral-losses: #EF4444;
+  --coral-losses-bg: rgba(239, 68, 68, 0.08);
+  
+  --card-bg: #141413;
+}
+
+/* Smooth transitions for elements that shift with theme switcher */
+body, .card, header, .nav-pill, .nav-pill-item, input, select, textarea, button {
+  transition: background-color 0.4s var(--ease-slow), color 0.4s var(--ease-slow), border-color 0.4s var(--ease-slow), box-shadow 0.4s var(--ease-slow);
+}
+
 /* Base resets */
 * {
   box-sizing: border-box;
