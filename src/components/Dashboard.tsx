@@ -365,7 +365,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             <AnimatedNumber value={balance} />
           </h1>
         </div>
-        <div className="flex align-center gap-2" style={{ marginTop: 'var(--space-2)' }}>
+        <div className="flex align-center justify-center gap-2 flex-wrap" style={{ marginTop: 'var(--space-2)' }}>
           <span className="badge badge-gain">
             <TrendingUp size={12} style={{ marginRight: '4px' }} /> Focus: {getGoalLabel(goal)}
           </span>
@@ -390,7 +390,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
         {balance > 0 && (
           <div style={{
             width: '100%',
-            maxWidth: '320px',
+            maxWidth: '100%',
             height: '6px',
             backgroundColor: 'var(--border-color)',
             borderRadius: '3px',
@@ -455,15 +455,16 @@ export const Dashboard: React.FC<DashboardProps> = ({
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: '6px',
-                padding: '6px 12px',
+                gap: '5px',
+                padding: '5px 10px',
                 borderRadius: '20px',
                 backgroundColor: 'rgba(128, 128, 128, 0.06)',
                 border: '1px solid var(--border-color)',
-                fontSize: '0.78rem',
+                fontSize: '0.74rem',
                 color: 'var(--ink-muted)',
                 cursor: 'pointer',
                 transition: 'all 0.2s ease',
+                whiteSpace: 'nowrap',
               }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.backgroundColor = 'rgba(128, 128, 128, 0.12)';
