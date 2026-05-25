@@ -88,3 +88,43 @@ self.addEventListener('fetch', (event) => {
     })
   );
 });
+
+// ─── Push Notifications ────────────────────────────────────────────────────
+
+self.addEventListener('push', (event) => {
+  const data = event.data ? event.data.json() : {};
+  const title = data.title || 'Lumen';
+  const options = {
+    body: data.body || "Did you log your expenses today? Tap to add now.",
+    icon: '/icon-192.png',
+    badge: '/favicon.png',
+    tag: 'lumen-daily-reminder',
+    renotify: true,
+    actions: [
+      { action: 'log', title: 'Log now →' }
+    ],
+    data: { url: '/?action=quick-log' }
+  };
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const targetUrl = (event.notification.data && event.notification.data.url) || '/?action=quick-log';
+
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+      // Focus existing open window if available
+      for (const client of clientList) {
+        if (client.url.includes(self.location.origin) && 'focus' in client) {
+          client.postMessage({ type: 'OPEN_QUICK_LOG' });
+          return client.focus();
+        }
+      }
+      // Otherwise open a new window
+      if (self.clients.openWindow) {
+        return self.clients.openWindow(targetUrl);
+      }
+    })
+  );
+});

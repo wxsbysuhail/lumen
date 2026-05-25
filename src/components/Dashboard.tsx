@@ -35,6 +35,8 @@ interface DashboardProps {
   recurringExpenses?: number;
   savingsTargetsSum?: number;
   partnerProfile?: { id: string; name: string; email: string } | null;
+  streak?: number;
+  loggedToday?: boolean;
 }
 
 // Custom Motion Count-up Component
@@ -70,6 +72,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
   recurringExpenses = 0,
   savingsTargetsSum = 0,
   partnerProfile = null,
+  streak = 0,
+  loggedToday = false,
 }) => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [desc, setDesc] = useState('');
@@ -83,6 +87,13 @@ export const Dashboard: React.FC<DashboardProps> = ({
       setSplitWithPartner(false);
     }
   }, [showAddModal]);
+
+  // Listen for quick-log event from PWA shortcut / notification tap
+  useEffect(() => {
+    const handler = () => setShowAddModal(true);
+    window.addEventListener('lumen:open-quick-log', handler);
+    return () => window.removeEventListener('lumen:open-quick-log', handler);
+  }, []);
 
   // Balance adjust modal states
   const [showAdjustModal, setShowAdjustModal] = useState(false);
@@ -358,6 +369,21 @@ export const Dashboard: React.FC<DashboardProps> = ({
           <span className="badge badge-gain">
             <TrendingUp size={12} style={{ marginRight: '4px' }} /> Focus: {getGoalLabel(goal)}
           </span>
+          {/* Streak chip */}
+          <button
+            type="button"
+            className={`streak-chip ${streak >= 7 ? 'mega' : streak >= 2 ? 'active' : loggedToday ? 'today' : 'zero'}`}
+            onClick={() => setShowAddModal(true)}
+            title={streak >= 2 ? `${streak}-day logging streak! Keep it up.` : loggedToday ? 'Logged today — great job!' : 'Log a transaction to start your streak'}
+          >
+            {streak >= 2 ? (
+              <>{streak >= 7 ? '🔥' : '🔥'} {streak}d streak</>
+            ) : loggedToday ? (
+              <>✅ Logged today</>
+            ) : (
+              <>+ Log today</>
+            )}
+          </button>
         </div>
 
         {/* Horizontal Stacked Bar representing asset allocations */}

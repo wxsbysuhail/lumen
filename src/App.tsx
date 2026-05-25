@@ -12,6 +12,7 @@ import { JointSync } from './components/JointSync';
 import { AICoach } from './components/AICoach';
 import { Login } from './components/Login';
 import { supabase } from './supabaseClient';
+import { useNotifications } from './hooks/useNotifications';
 
 import {
   LayoutDashboard,
@@ -30,6 +31,8 @@ import {
   Moon,
   Users,
   Bot,
+  Bell,
+  BellOff,
 } from 'lucide-react';
 
 interface Transaction {
@@ -1228,6 +1231,45 @@ function App() {
     }
   };
 
+  // ─── Streak calculation ────────────────────────────────────────────────────
+  const computeStreak = (txs: typeof transactions): { streak: number; loggedToday: boolean } => {
+    if (!txs.length) return { streak: 0, loggedToday: false };
+    const toDateStr = (d: string) => new Date(d).toLocaleDateString('en-CA'); // YYYY-MM-DD
+    const today = new Date().toLocaleDateString('en-CA');
+    const yesterday = new Date(Date.now() - 86400000).toLocaleDateString('en-CA');
+    const uniqueDays = [...new Set(txs.map(t => toDateStr(t.date)))].sort().reverse();
+    const loggedToday = uniqueDays[0] === today;
+    // Forgiving: if nothing logged today yet, start counting from yesterday
+    let cursor = loggedToday ? today : yesterday;
+    let streak = 0;
+    for (const day of uniqueDays) {
+      if (day === cursor) {
+        streak++;
+        const prev = new Date(new Date(cursor).getTime() - 86400000);
+        cursor = prev.toLocaleDateString('en-CA');
+      } else if (day < cursor) {
+        break;
+      }
+    }
+    return { streak, loggedToday };
+  };
+  const { streak, loggedToday } = computeStreak(transactions);
+
+  // Notifications hook (opt-in)
+  const { showBanner, requestPermission, dismissBanner } = useNotifications(!!session, loggedToday);
+
+  // Handle ?action=quick-log deep-link (from PWA shortcut or notification click)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('action') === 'quick-log' && session && isOnboarded) {
+      setActiveTab('dashboard');
+      // Small delay so Dashboard mounts before we signal it
+      setTimeout(() => window.dispatchEvent(new CustomEvent('lumen:open-quick-log')), 300);
+      // Clean up URL without reload
+      window.history.replaceState({}, '', '/');
+    }
+  }, [session, isOnboarded]);
+
   // Calculations for dashboard
   const activeInflowSum = recurringIncomeItems.reduce((acc, i) => acc + i.amount, 0);
   const activeOutflowSum = recurringExpenseItems.reduce((acc, i) => acc + i.amount, 0);
@@ -1437,6 +1479,8 @@ function App() {
                   recurringExpenses={activeOutflowSum}
                   savingsTargetsSum={savingsTargetsSum}
                   partnerProfile={partnerProfile}
+                  streak={streak}
+                  loggedToday={loggedToday}
                 />
               )}
 
@@ -1744,6 +1788,35 @@ function App() {
                   </div>
                 </motion.div>
               </>
+            )}
+          </AnimatePresence>
+
+          {/* Notification Permission Banner */}
+          <AnimatePresence>
+            {showBanner && (
+              <motion.div
+                className="notif-banner"
+                initial={{ opacity: 0, y: 60, x: '-50%' }}
+                animate={{ opacity: 1, y: 0, x: '-50%' }}
+                exit={{ opacity: 0, y: 60, x: '-50%' }}
+                transition={{ type: 'spring', damping: 26, stiffness: 280 }}
+              >
+                <div className="notif-banner-icon">
+                  <Bell size={16} />
+                </div>
+                <div className="notif-banner-text">
+                  <span className="notif-banner-title">Stay on top of spending</span>
+                  <span className="notif-banner-sub">Get a daily reminder at 8 PM to log expenses</span>
+                </div>
+                <div className="notif-banner-actions">
+                  <button className="notif-banner-btn primary" onClick={requestPermission}>
+                    Enable
+                  </button>
+                  <button className="notif-banner-btn" onClick={dismissBanner}>
+                    <BellOff size={14} />
+                  </button>
+                </div>
+              </motion.div>
             )}
           </AnimatePresence>
 
