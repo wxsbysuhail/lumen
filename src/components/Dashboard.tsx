@@ -322,7 +322,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
         )}
 
         {/* Clickable glassmorphic badges */}
-        <div className="flex gap-2 justify-center flex-wrap" style={{ marginTop: '12px', width: '100%', maxWidth: '420px' }}>
+        <div className="flex gap-2 justify-center flex-wrap" style={{ marginTop: '12px', width: '100%', maxWidth: '600px' }}>
           {[
             {
               label: 'Cash',
@@ -391,10 +391,12 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
       {/* Safe to Spend Card */}
       <div className="card flex flex-col justify-between" style={{
-        padding: 'var(--space-5) var(--space-6)',
+        padding: 'var(--space-8)',
         backgroundColor: '#FFFFFF',
         position: 'relative',
         overflow: 'hidden',
+        minHeight: '200px',
+        gap: 'var(--space-4)',
       }}>
         {/* Soft warning/danger/success aura glow behind the card */}
         <div style={{
@@ -441,10 +443,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </span>
         </div>
 
-        <div className="flex justify-between align-end" style={{ marginTop: '12px', zIndex: 1 }}>
+        <div className="flex justify-between align-center" style={{ zIndex: 1, width: '100%' }}>
           <div>
             <h2 className="num" style={{
-              fontSize: '2.2rem',
+              fontSize: '2.4rem',
               fontWeight: 400,
               letterSpacing: '-0.03em',
               lineHeight: 1,
@@ -452,7 +454,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             }}>
               Rs. {safeToSpend.toLocaleString('en-US')}
             </h2>
-            <p style={{ color: 'var(--ink-muted)', fontSize: '0.78rem', marginTop: '6px' }}>
+            <p style={{ color: 'var(--ink-muted)', fontSize: '0.8rem', marginTop: '6px' }}>
               {safeToSpend > 5000 
                 ? 'Your spending is well within safe boundaries.' 
                 : safeToSpend > 0 
@@ -463,11 +465,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
           <div style={{ textAlign: 'right' }}>
             <span style={{ fontSize: '0.75rem', color: 'var(--ink-muted)' }}>Daily Allowance</span>
-            <h4 className="num" style={{ fontSize: '1.1rem', fontWeight: 600, color: 'var(--ink-color)' }}>
+            <h4 className="num" style={{ fontSize: '1.25rem', fontWeight: 600, color: 'var(--ink-color)', marginTop: '2px' }}>
               Rs. {dailyAllowance.toLocaleString('en-US')}/day
             </h4>
-            <span style={{ fontSize: '0.7rem', color: 'var(--ink-muted)' }}>
-              for {daysRemaining} days left
+            <span style={{ fontSize: '0.72rem', color: 'var(--ink-muted)' }}>
+              for {daysRemaining} {daysRemaining === 1 ? 'day' : 'days'} left
             </span>
           </div>
         </div>
@@ -480,7 +482,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
             backgroundColor: 'var(--border-color)',
             borderRadius: '3px',
             overflow: 'hidden',
-            marginTop: '16px',
             zIndex: 1,
           }}>
             <div style={{

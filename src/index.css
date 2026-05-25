@@ -141,7 +141,7 @@ h1, h2, h3, h4, h5, h6 {
 /* Layout Utilities */
 .container {
   width: 100%;
-  max-width: 1040px;
+  max-width: 1320px;
   margin: 0 auto;
   padding: var(--space-8) var(--space-6);
   position: relative;
@@ -383,7 +383,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .nav-container {
-  max-width: 1120px;
+  max-width: 1320px;
   margin: 0 auto;
   padding: 0 var(--space-6);
   height: 100%;
