@@ -324,7 +324,7 @@ export const SavingsTracker: React.FC<SavingsTrackerProps> = ({
         })}
       </div>
 
-      {/* Add Bucket Drawer */}
+      {/* Add Bucket Modal */}
       {showAddForm && (
         <div style={{
           position: 'fixed',
@@ -332,11 +332,14 @@ export const SavingsTracker: React.FC<SavingsTrackerProps> = ({
           left: 0,
           right: 0,
           bottom: 0,
-          backgroundColor: 'rgba(10, 10, 10, 0.4)',
+          backgroundColor: 'rgba(10, 10, 10, 0.45)',
           backdropFilter: 'blur(8px)',
+          WebkitBackdropFilter: 'blur(8px)',
           display: 'flex',
-          justifyContent: 'flex-end',
+          alignItems: 'center',
+          justifyContent: 'center',
           zIndex: 2000,
+          padding: '16px',
         }}>
           {/* Backdrop click handler to close */}
           <div 
@@ -345,21 +348,20 @@ export const SavingsTracker: React.FC<SavingsTrackerProps> = ({
           />
 
           <motion.div
-            initial={{ x: '100%', opacity: 0.9 }}
-            animate={{ x: 0, opacity: 1 }}
-            exit={{ x: '100%', opacity: 0.9 }}
-            transition={{ type: 'spring', damping: 28, stiffness: 240 }}
+            initial={{ opacity: 0, scale: 0.94, y: 8 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.94, y: 8 }}
+            transition={{ type: 'tween', ease: [0.16, 1, 0.3, 1], duration: 0.28 }}
             className="card"
             style={{
               width: '100%',
-              maxWidth: '460px',
-              height: '100%',
-              maxHeight: '100vh',
+              maxWidth: '480px',
+              maxHeight: 'calc(100vh - 40px)',
               backgroundColor: 'var(--card-bg)',
-              borderRadius: '24px 0 0 24px',
-              borderLeft: '1px solid var(--border-color)',
-              boxShadow: '-10px 0 40px rgba(0,0,0,0.08)',
-              padding: '32px',
+              borderRadius: '24px',
+              border: '1px solid var(--border-color)',
+              boxShadow: '0 4px 6px rgba(0,0,0,0.04), 0 24px 64px rgba(0,0,0,0.18)',
+              padding: '28px',
               display: 'flex',
               flexDirection: 'column',
               zIndex: 2001,
@@ -562,7 +564,7 @@ export const SavingsTracker: React.FC<SavingsTrackerProps> = ({
         </div>
       )}
 
-      {/* Deposit to Bucket Drawer */}
+      {/* Deposit to Bucket Modal */}
       {depositBucketId && (
         <div style={{
           position: 'fixed',
@@ -570,11 +572,14 @@ export const SavingsTracker: React.FC<SavingsTrackerProps> = ({
           left: 0,
           right: 0,
           bottom: 0,
-          backgroundColor: 'rgba(10, 10, 10, 0.4)',
+          backgroundColor: 'rgba(10, 10, 10, 0.45)',
           backdropFilter: 'blur(8px)',
+          WebkitBackdropFilter: 'blur(8px)',
           display: 'flex',
-          justifyContent: 'flex-end',
+          alignItems: 'center',
+          justifyContent: 'center',
           zIndex: 2000,
+          padding: '16px',
         }}>
           {/* Backdrop click handler to close */}
           <div 
@@ -583,21 +588,20 @@ export const SavingsTracker: React.FC<SavingsTrackerProps> = ({
           />
 
           <motion.div
-            initial={{ x: '100%', opacity: 0.9 }}
-            animate={{ x: 0, opacity: 1 }}
-            exit={{ x: '100%', opacity: 0.9 }}
-            transition={{ type: 'spring', damping: 28, stiffness: 240 }}
+            initial={{ opacity: 0, scale: 0.94, y: 8 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.94, y: 8 }}
+            transition={{ type: 'tween', ease: [0.16, 1, 0.3, 1], duration: 0.28 }}
             className="card"
             style={{
               width: '100%',
-              maxWidth: '460px',
-              height: '100%',
-              maxHeight: '100vh',
+              maxWidth: '420px',
+              maxHeight: 'calc(100vh - 40px)',
               backgroundColor: 'var(--card-bg)',
-              borderRadius: '24px 0 0 24px',
-              borderLeft: '1px solid var(--border-color)',
-              boxShadow: '-10px 0 40px rgba(0,0,0,0.08)',
-              padding: '32px',
+              borderRadius: '24px',
+              border: '1px solid var(--border-color)',
+              boxShadow: '0 4px 6px rgba(0,0,0,0.04), 0 24px 64px rgba(0,0,0,0.18)',
+              padding: '28px',
               display: 'flex',
               flexDirection: 'column',
               zIndex: 2001,
@@ -672,7 +676,7 @@ export const SavingsTracker: React.FC<SavingsTrackerProps> = ({
         </div>
       )}
 
-      {/* Edit Bucket Drawer */}
+      {/* Edit Bucket Modal */}
       {editingBucket && (
         <div style={{
           position: 'fixed',
@@ -680,11 +684,14 @@ export const SavingsTracker: React.FC<SavingsTrackerProps> = ({
           left: 0,
           right: 0,
           bottom: 0,
-          backgroundColor: 'rgba(10, 10, 10, 0.4)',
+          backgroundColor: 'rgba(10, 10, 10, 0.45)',
           backdropFilter: 'blur(8px)',
+          WebkitBackdropFilter: 'blur(8px)',
           display: 'flex',
-          justifyContent: 'flex-end',
+          alignItems: 'center',
+          justifyContent: 'center',
           zIndex: 2000,
+          padding: '16px',
         }}>
           {/* Backdrop click handler to close */}
           <div 
@@ -693,21 +700,20 @@ export const SavingsTracker: React.FC<SavingsTrackerProps> = ({
           />
 
           <motion.div
-            initial={{ x: '100%', opacity: 0.9 }}
-            animate={{ x: 0, opacity: 1 }}
-            exit={{ x: '100%', opacity: 0.9 }}
-            transition={{ type: 'spring', damping: 28, stiffness: 240 }}
+            initial={{ opacity: 0, scale: 0.94, y: 8 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.94, y: 8 }}
+            transition={{ type: 'tween', ease: [0.16, 1, 0.3, 1], duration: 0.28 }}
             className="card"
             style={{
               width: '100%',
-              maxWidth: '460px',
-              height: '100%',
-              maxHeight: '100vh',
+              maxWidth: '480px',
+              maxHeight: 'calc(100vh - 40px)',
               backgroundColor: 'var(--card-bg)',
-              borderRadius: '24px 0 0 24px',
-              borderLeft: '1px solid var(--border-color)',
-              boxShadow: '-10px 0 40px rgba(0,0,0,0.08)',
-              padding: '32px',
+              borderRadius: '24px',
+              border: '1px solid var(--border-color)',
+              boxShadow: '0 4px 6px rgba(0,0,0,0.04), 0 24px 64px rgba(0,0,0,0.18)',
+              padding: '28px',
               display: 'flex',
               flexDirection: 'column',
               zIndex: 2001,
