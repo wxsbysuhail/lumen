@@ -24,7 +24,7 @@ import {
   RotateCcw,
   PieChart,
   LogOut,
-  Grid,
+  MoreHorizontal,
   X,
   Download,
   Sun,
@@ -174,7 +174,13 @@ function App() {
   const [hideNav, setHideNav] = useState(false);
 
   // Theme state
-  const [theme, setTheme] = useState<'light' | 'dark'>(() => (localStorage.getItem('lumen-theme') as 'light' | 'dark') || 'light');
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
+    const stored = localStorage.getItem('lumen-theme');
+    const resolved: 'light' | 'dark' = stored === 'light' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', resolved);
+    localStorage.setItem('lumen-theme', resolved);
+    return resolved;
+  });
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
@@ -1421,7 +1427,7 @@ function App() {
                     />
                   )}
                   <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    More <Grid size={12} />
+                    More <MoreHorizontal size={12} />
                   </span>
                 </button>
               </nav>
@@ -1610,13 +1616,10 @@ function App() {
               title="Dashboard"
             >
               {activeTab === 'dashboard' && (
-                <motion.div
-                  layoutId="activeMobileTabBg"
-                  className="mobile-pill-active-bg"
-                  transition={{ type: 'spring', stiffness: 380, damping: 30 }}
-                />
+                <motion.div layoutId="activeMobileTabBg" className="mobile-pill-active-bg" transition={{ type: 'spring', stiffness: 380, damping: 30 }} />
               )}
-              <LayoutDashboard size={18} />
+              <LayoutDashboard size={17} />
+              <span className="mobile-pill-label">Home</span>
             </button>
 
             <button
@@ -1625,13 +1628,10 @@ function App() {
               title="Cash Flow"
             >
               {activeTab === 'cashflow' && (
-                <motion.div
-                  layoutId="activeMobileTabBg"
-                  className="mobile-pill-active-bg"
-                  transition={{ type: 'spring', stiffness: 380, damping: 30 }}
-                />
+                <motion.div layoutId="activeMobileTabBg" className="mobile-pill-active-bg" transition={{ type: 'spring', stiffness: 380, damping: 30 }} />
               )}
-              <ArrowLeftRight size={18} />
+              <ArrowLeftRight size={17} />
+              <span className="mobile-pill-label">Flow</span>
             </button>
 
             <button
@@ -1640,13 +1640,10 @@ function App() {
               title="Savings"
             >
               {activeTab === 'savings' && (
-                <motion.div
-                  layoutId="activeMobileTabBg"
-                  className="mobile-pill-active-bg"
-                  transition={{ type: 'spring', stiffness: 380, damping: 30 }}
-                />
+                <motion.div layoutId="activeMobileTabBg" className="mobile-pill-active-bg" transition={{ type: 'spring', stiffness: 380, damping: 30 }} />
               )}
-              <Target size={18} />
+              <Target size={17} />
+              <span className="mobile-pill-label">Savings</span>
             </button>
 
             <button
@@ -1655,28 +1652,22 @@ function App() {
               title="Invest"
             >
               {activeTab === 'investments' && (
-                <motion.div
-                  layoutId="activeMobileTabBg"
-                  className="mobile-pill-active-bg"
-                  transition={{ type: 'spring', stiffness: 380, damping: 30 }}
-                />
+                <motion.div layoutId="activeMobileTabBg" className="mobile-pill-active-bg" transition={{ type: 'spring', stiffness: 380, damping: 30 }} />
               )}
-              <TrendingUp size={18} />
+              <TrendingUp size={17} />
+              <span className="mobile-pill-label">Invest</span>
             </button>
 
             <button
               className={`mobile-pill-item ${isMoreActive ? 'active' : ''}`}
               onClick={toggleMoreHub}
-              title="More Options"
+              title="More"
             >
               {isMoreActive && (
-                <motion.div
-                  layoutId="activeMobileTabBg"
-                  className="mobile-pill-active-bg"
-                  transition={{ type: 'spring', stiffness: 380, damping: 30 }}
-                />
+                <motion.div layoutId="activeMobileTabBg" className="mobile-pill-active-bg" transition={{ type: 'spring', stiffness: 380, damping: 30 }} />
               )}
-              <Grid size={18} />
+              <MoreHorizontal size={17} />
+              <span className="mobile-pill-label">More</span>
             </button>
           </motion.nav>
 
@@ -1704,7 +1695,7 @@ function App() {
                   style={{ top: '50%', left: '50%' }}
                 >
                   <div className="hub-sheet-header">
-                    <h3 className="hub-sheet-title">More Hub</h3>
+                    <h3 className="hub-sheet-title">More</h3>
                     <button className="hub-sheet-close" onClick={() => setShowMoreHub(false)}>
                       <X size={16} />
                     </button>
@@ -1769,7 +1760,7 @@ function App() {
                         onClick={() => navigateTo('assistant')}
                         style={{ gridColumn: '1 / -1' }}
                       >
-                        <div className="hub-card-icon-wrapper" style={{ color: 'var(--emerald-gains)', backgroundColor: 'var(--emerald-gains-bg)' }}>
+                        <div className="hub-card-icon-wrapper" style={{ color: 'var(--emerald-gains)' }}>
                           <Bot size={18} />
                         </div>
                         <div className="hub-card-text">

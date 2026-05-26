@@ -104,12 +104,12 @@ export const JointSync: React.FC<JointSyncProps> = ({
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -15 }}
       transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-      className="flex flex-col gap-8"
+      style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}
     >
-      <div className="flex flex-col gap-2">
-        <h1 className="serif-title" style={{ fontSize: '2.5rem', fontWeight: 400, fontStyle: 'italic' }}>Joint Sync & Splits</h1>
-        <p style={{ color: 'var(--ink-muted)' }}>
-          Sync your financial ledger with a partner, track shared bills, and settle balances in one tap.
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+        <h1 style={{ fontFamily: 'var(--font-sans)', fontSize: '1.75rem', fontWeight: 700, letterSpacing: '-0.03em', color: 'var(--ink-color)', margin: 0 }}>Joint Sync & Splits</h1>
+        <p style={{ color: 'var(--ink-light)', fontSize: '0.85rem', lineHeight: '1.5', margin: 0 }}>
+          Link with a partner · Track shared expenses · Settle balances in one tap
         </p>
       </div>
 
@@ -151,7 +151,7 @@ export const JointSync: React.FC<JointSyncProps> = ({
       {jointLink && partnerProfile ? (
         <div className="grid grid-2 gap-6">
           {/* Partner Chip / Status Card */}
-          <div className="card flex flex-col gap-6" style={{ backgroundColor: 'var(--card-bg)' }}>
+          <div className="card flex flex-col gap-6">
             <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <Heart size={16} className="text-loss" style={{ fill: 'var(--coral-losses)' }} />
               <span>Joint Connection Active</span>
@@ -161,7 +161,7 @@ export const JointSync: React.FC<JointSyncProps> = ({
               padding: '16px',
               borderRadius: '16px',
               border: '1px solid var(--border-color)',
-              background: 'var(--bg-color)'
+              background: 'var(--nav-pill-bg)'
             }}>
               <div style={{
                 width: '44px',
@@ -210,7 +210,7 @@ export const JointSync: React.FC<JointSyncProps> = ({
           </div>
 
           {/* Settle Up Board */}
-          <div className="card flex flex-col gap-6" style={{ backgroundColor: 'var(--card-bg)' }}>
+          <div className="card flex flex-col gap-6">
             <div className="card-title">Settlement Debt Board</div>
 
             <div className="flex flex-col align-center justify-center text-center" style={{
@@ -272,7 +272,7 @@ export const JointSync: React.FC<JointSyncProps> = ({
                     return (
                       <div key={t.id} className="flex justify-between align-center" style={{
                         padding: '8px 10px',
-                        background: 'var(--bg-color)',
+                        background: 'var(--nav-pill-bg)',
                         borderRadius: '10px',
                         border: '1px solid var(--border-color)',
                         fontSize: '0.82rem'
@@ -298,7 +298,7 @@ export const JointSync: React.FC<JointSyncProps> = ({
         /* LINK ACCOUNT / INVITATION INTERFACE */
         <div className="grid grid-2 gap-6">
           {/* Send invitation card */}
-          <div className="card flex flex-col gap-4" style={{ backgroundColor: 'var(--card-bg)' }}>
+          <div className="card flex flex-col gap-4">
             <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <UserPlus size={16} />
               <span>Link with Partner</span>
@@ -342,7 +342,7 @@ export const JointSync: React.FC<JointSyncProps> = ({
                 padding: '12px',
                 borderRadius: '12px',
                 border: '1px solid var(--border-color)',
-                background: 'var(--bg-color)',
+                background: 'var(--nav-pill-bg)',
                 fontSize: '0.82rem',
                 display: 'flex',
                 flexDirection: 'column',
@@ -364,7 +364,7 @@ export const JointSync: React.FC<JointSyncProps> = ({
           </div>
 
           {/* Incoming invitations card */}
-          <div className="card flex flex-col gap-4" style={{ backgroundColor: 'var(--card-bg)' }}>
+          <div className="card flex flex-col gap-4">
             <div className="card-title">Link Invitations</div>
             
             {incomingInvite ? (
@@ -372,7 +372,7 @@ export const JointSync: React.FC<JointSyncProps> = ({
                 padding: '16px',
                 borderRadius: '16px',
                 border: '1px solid var(--border-color)',
-                background: 'var(--bg-color)'
+                background: 'var(--nav-pill-bg)'
               }}>
                 <div className="flex align-center gap-3">
                   <div style={{
@@ -411,9 +411,10 @@ export const JointSync: React.FC<JointSyncProps> = ({
                 </div>
               </div>
             ) : (
-              <div className="flex flex-col align-center justify-center text-center" style={{ padding: 'var(--space-8) 0', color: 'var(--ink-light)', gap: 'var(--space-2)' }}>
-                <Users size={20} style={{ opacity: 0.5 }} />
-                <p style={{ fontSize: '0.85rem' }}>No pending partner invitations.</p>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: '2.5rem 0', gap: '8px', color: 'var(--ink-light)' }}>
+                <span style={{ fontSize: '1.5rem' }}>💌</span>
+                <span style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--ink-muted)' }}>No pending invitations</span>
+                <span style={{ fontSize: '0.78rem' }}>When someone sends you a link request, it'll appear here.</span>
               </div>
             )}
           </div>

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../supabaseClient';
-import { Shield, Mail, Lock, ArrowRight } from 'lucide-react';
+import { Shield, Mail, Lock, ArrowRight, AlertCircle } from 'lucide-react';
 
 interface LoginProps {
   onAuthSuccess: () => void;
@@ -89,12 +90,10 @@ export const Login: React.FC<LoginProps> = ({ onAuthSuccess }) => {
         display: 'flex',
         flexDirection: 'column',
         gap: 'var(--space-6)',
-        backgroundColor: 'var(--card-bg)',
-        border: '1px solid var(--border-color)',
       }}>
         
         {/* Header */}
-        <div className="flex flex-col align-center gap-2" style={{ textAlign: 'center' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: '8px' }}>
           <div style={{
             width: '48px',
             height: '48px',
@@ -109,74 +108,72 @@ export const Login: React.FC<LoginProps> = ({ onAuthSuccess }) => {
             <Shield size={24} />
           </div>
           <h1 className="serif-title" style={{ fontSize: '2rem', margin: 0 }}>Lumen</h1>
-          <p style={{ color: 'var(--ink-muted)', fontSize: '0.9rem', margin: 0 }}>
+          <p style={{ color: 'var(--ink-light)', fontSize: '0.85rem', margin: 0 }}>
             Personal Finance & Wealth Management
           </p>
         </div>
 
         {/* Tabbed Selector */}
-        <div style={{
-          display: 'flex',
-          background: 'rgba(10,10,10,0.03)',
-          padding: '4px',
-          borderRadius: '8px',
-          border: '1px solid var(--border-color)',
-        }}>
+        <div className="segmented-control">
           <button
+            type="button"
             onClick={() => { setIsSignUp(false); setErrorMessage(null); }}
-            style={{
-              flex: 1,
-              padding: 'var(--space-2) 0',
-              border: 'none',
-              background: !isSignUp ? 'var(--card-bg)' : 'transparent',
-              color: !isSignUp ? 'var(--ink-color)' : 'var(--ink-muted)',
-              fontSize: '0.85rem',
-              fontWeight: 600,
-              borderRadius: '6px',
-              cursor: 'pointer',
-              boxShadow: !isSignUp ? '0 1px 3px rgba(0,0,0,0.05)' : 'none',
-              transition: 'all 0.2s ease',
-            }}
+            className={`segment-btn ${!isSignUp ? 'active' : ''}`}
           >
-            Log In
+            <span>Log In</span>
+            {!isSignUp && (
+              <motion.div
+                layoutId="login-tab-indicator"
+                className="active-indicator"
+                transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+              />
+            )}
           </button>
           <button
+            type="button"
             onClick={() => { setIsSignUp(true); setErrorMessage(null); }}
-            style={{
-              flex: 1,
-              padding: 'var(--space-2) 0',
-              border: 'none',
-              background: isSignUp ? 'var(--card-bg)' : 'transparent',
-              color: isSignUp ? 'var(--ink-color)' : 'var(--ink-muted)',
-              fontSize: '0.85rem',
-              fontWeight: 600,
-              borderRadius: '6px',
-              cursor: 'pointer',
-              boxShadow: isSignUp ? '0 1px 3px rgba(0,0,0,0.05)' : 'none',
-              transition: 'all 0.2s ease',
-            }}
+            className={`segment-btn ${isSignUp ? 'active' : ''}`}
           >
-            Sign Up
+            <span>Sign Up</span>
+            {isSignUp && (
+              <motion.div
+                layoutId="login-tab-indicator"
+                className="active-indicator"
+                transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+              />
+            )}
           </button>
         </div>
 
-        {/* Error Message Panel */}
-        {errorMessage && (
-          <div style={{
-            padding: 'var(--space-3) var(--space-4)',
-            backgroundColor: 'rgba(239, 68, 68, 0.08)',
-            border: '1px solid rgba(239, 68, 68, 0.2)',
-            borderRadius: '8px',
-            color: '#ef4444',
-            fontSize: '0.85rem',
-            lineHeight: '1.4',
-          }}>
-            {errorMessage}
-          </div>
-        )}
+        {/* Error / Info Message Panel */}
+        <AnimatePresence>
+          {errorMessage && (
+            <motion.div
+              initial={{ opacity: 0, y: -6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.2 }}
+              style={{
+                padding: 'var(--space-3) var(--space-4)',
+                backgroundColor: 'var(--coral-losses-bg)',
+                border: '1px solid rgba(232, 93, 93, 0.2)',
+                borderRadius: '10px',
+                color: 'var(--coral-losses)',
+                fontSize: '0.83rem',
+                lineHeight: '1.45',
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: '8px',
+              }}
+            >
+              <AlertCircle size={14} style={{ flexShrink: 0, marginTop: '2px' }} />
+              <span>{errorMessage}</span>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Form */}
-        <form onSubmit={handleEmailAuth} className="flex flex-col gap-4">
+        <form onSubmit={handleEmailAuth} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
           <div className="input-group">
             <label className="input-label">EMAIL ADDRESS</label>
             <div style={{ position: 'relative' }}>
@@ -263,8 +260,6 @@ export const Login: React.FC<LoginProps> = ({ onAuthSuccess }) => {
             width: '100%',
             height: '48px',
             justifyContent: 'center',
-            backgroundColor: 'var(--card-bg)',
-            border: '1px solid var(--border-color)',
             gap: 'var(--space-3)',
           }}
           disabled={loading}

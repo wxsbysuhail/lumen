@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { BookOpen, AlertCircle, Globe } from 'lucide-react';
+import { BookOpen, AlertCircle, Globe, X, TrendingUp, TrendingDown } from 'lucide-react';
 
 interface Holding {
   ticker: string;
@@ -208,19 +208,31 @@ export const Investments: React.FC<InvestmentsProps> = ({
   const isInsuffShares = selectedStock ? (tradeType === 'sell' && (!currentHolding || currentHolding.shares < shares)) : false;
   const hasError = isOverdraft || isInsuffShares;
 
+  // ── Shared modal style constants ──────────────────────────────────────────
+  const BACKDROP: React.CSSProperties = {
+    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+    background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
+    display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '1rem',
+  };
+  const MODAL_PANEL: React.CSSProperties = {
+    background: 'var(--card-bg)', border: '1px solid var(--border-color)',
+    borderRadius: '1.5rem', padding: '1.5rem', width: '100%', maxWidth: '420px',
+    position: 'relative', zIndex: 1001,
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 15 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -15 }}
       transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-      className="flex flex-col gap-8"
+      style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}
     >
-      <div className="flex justify-between align-end gap-4" style={{ flexWrap: 'wrap' }}>
-        <div className="flex flex-col gap-2">
-          <h1 className="serif-title" style={{ fontSize: '2.5rem', fontWeight: 400, fontStyle: 'italic' }}>Investments & Assets</h1>
-          <p style={{ color: 'var(--ink-muted)' }}>
-            Track real-time stock simulations, log portfolio purchase/sales, and read principles.
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: '1rem', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          <h1 style={{ fontFamily: 'var(--font-sans)', fontSize: '1.75rem', fontWeight: 700, letterSpacing: '-0.03em', color: 'var(--ink-color)', margin: 0 }}>Investments & Assets</h1>
+          <p style={{ color: 'var(--ink-light)', fontSize: '0.85rem', lineHeight: '1.5', margin: 0 }}>
+            Simulated live prices · Portfolio tracking · Investment principles
           </p>
         </div>
 
@@ -251,26 +263,28 @@ export const Investments: React.FC<InvestmentsProps> = ({
       </div>
 
       {/* Portfolio Value Summary Card */}
-      <div className="card grid grid-3 gap-6" style={{ backgroundColor: 'var(--card-bg)' }}>
-        <div className="flex flex-col gap-1" style={{ borderRight: '1px solid var(--border-color)', paddingRight: 'var(--space-4)' }}>
-          <span style={{ fontSize: '0.8rem', color: 'var(--ink-muted)', fontWeight: 600, textTransform: 'uppercase' }}>Assets Valuation</span>
-          <h2 className="num" style={{ fontSize: '1.8rem', fontWeight: 550 }}>
+      <div className="card grid grid-3 gap-6">
+        <div style={{ borderRight: '1px solid var(--border-color)', paddingRight: 'var(--space-4)' }}>
+          <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--ink-light)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Portfolio Value</span>
+          <h2 className="num" style={{ fontSize: '2rem', fontWeight: 700, letterSpacing: '-0.04em', marginTop: '2px', marginBottom: 0 }}>
             {getCurrencySymbol(displayCurrency)}{portfolioValueDisplay.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </h2>
+          <span style={{ fontSize: '0.75rem', color: 'var(--ink-muted)' }}>Cost: {getCurrencySymbol(displayCurrency)}{portfolioCostDisplay.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
         </div>
-        <div className="flex flex-col gap-1" style={{ borderRight: '1px solid var(--border-color)', paddingRight: 'var(--space-4)', paddingLeft: 'var(--space-2)' }}>
-          <span style={{ fontSize: '0.8rem', color: 'var(--ink-muted)', fontWeight: 600, textTransform: 'uppercase' }}>All-Time Returns</span>
-          <h2 className={`num ${portfolioReturnDisplay >= 0 ? 'text-gain' : 'text-loss'}`} style={{ fontSize: '1.8rem', fontWeight: 550 }}>
-            {portfolioReturnDisplay >= 0 ? '+' : ''}{getCurrencySymbol(displayCurrency)}{portfolioReturnDisplay.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+        <div style={{ borderRight: '1px solid var(--border-color)', paddingRight: 'var(--space-4)', paddingLeft: 'var(--space-2)' }}>
+          <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--ink-light)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>All-Time Return</span>
+          <h2 className={`num ${portfolioReturnDisplay >= 0 ? 'text-gain' : 'text-loss'}`} style={{ fontSize: '2rem', fontWeight: 700, letterSpacing: '-0.04em', marginTop: '2px', marginBottom: 0 }}>
+            {portfolioReturnDisplay >= 0 ? '+' : ''}{getCurrencySymbol(displayCurrency)}{Math.abs(portfolioReturnDisplay).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </h2>
-        </div>
-        <div className="flex flex-col gap-1" style={{ paddingLeft: 'var(--space-2)' }}>
-          <span style={{ fontSize: '0.8rem', color: 'var(--ink-muted)', fontWeight: 600, textTransform: 'uppercase' }}>Return rate %</span>
-          <div className="flex align-center gap-2" style={{ marginTop: '2px' }}>
-            <span className={`num ${portfolioReturnRate >= 0 ? 'text-gain' : 'text-loss'}`} style={{ fontSize: '1.8rem', fontWeight: 550 }}>
-              {portfolioReturnRate >= 0 ? '+' : ''}{portfolioReturnRate.toFixed(2)}%
-            </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}>
+            {portfolioReturnDisplay >= 0 ? <TrendingUp size={12} style={{ color: 'var(--emerald-gains)' }} /> : <TrendingDown size={12} style={{ color: 'var(--coral-losses)' }} />}
+            <span style={{ fontSize: '0.75rem', color: portfolioReturnDisplay >= 0 ? 'var(--emerald-gains)' : 'var(--coral-losses)', fontWeight: 600 }}>{portfolioReturnRate >= 0 ? '+' : ''}{portfolioReturnRate.toFixed(2)}% all time</span>
           </div>
+        </div>
+        <div style={{ paddingLeft: 'var(--space-2)' }}>
+          <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--ink-light)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Holdings</span>
+          <h2 className="num" style={{ fontSize: '2rem', fontWeight: 700, letterSpacing: '-0.04em', marginTop: '2px', marginBottom: 0 }}>{holdings.length}</h2>
+          <span style={{ fontSize: '0.75rem', color: 'var(--ink-muted)' }}>{holdings.length === 1 ? 'position' : 'positions'} tracked</span>
         </div>
       </div>
 
@@ -355,45 +369,59 @@ export const Investments: React.FC<InvestmentsProps> = ({
 
         {/* Portfolio Tracker Section */}
         <div className="card flex flex-col gap-4">
-          <div className="card-title">Portfolio Holdings</div>
+          <div className="card-title" style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: 'var(--space-2)', marginBottom: '0' }}>Portfolio Holdings</div>
           {holdings.length === 0 ? (
-            <div className="flex flex-col align-center justify-center" style={{ padding: 'var(--space-8) 0', color: 'var(--ink-light)', gap: 'var(--space-2)' }}>
-              <AlertCircle size={20} style={{ opacity: 0.5 }} />
-              <p style={{ fontSize: '0.9rem' }}>No asset holdings logged yet.</p>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '3rem 1rem', gap: '10px', textAlign: 'center' }}>
+              <div style={{ fontSize: '2rem', lineHeight: 1 }}>📊</div>
+              <p style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--ink-color)', margin: 0 }}>No positions yet</p>
+              <p style={{ fontSize: '0.8rem', color: 'var(--ink-muted)', margin: 0 }}>Buy a stock from the watchlist to start tracking.</p>
             </div>
           ) : (
-            <div className="flex flex-col gap-3">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
               {holdings.map((holding) => {
                 const stock = stocks.find(s => s.ticker === holding.ticker);
                 if (!stock) return null;
-                
+
                 const stockMurPrice = getStockMurPrice(stock);
                 const holdingValueMur = holding.shares * stockMurPrice;
                 const holdingCostMur = holding.shares * holding.avgPrice;
                 const holdingReturnRate = holdingCostMur > 0 ? ((holdingValueMur - holdingCostMur) / holdingCostMur) * 100 : 0;
-                
+                const allocationPct = portfolioValueMur > 0 ? (holdingValueMur / portfolioValueMur) * 100 : 0;
                 const holdingValueDisplay = convertAmount(holdingValueMur, 'MUR', displayCurrency);
                 const holdingAvgPriceDisplay = convertAmount(holding.avgPrice, 'MUR', displayCurrency);
+                const returnColor = holdingReturnRate >= 0 ? 'var(--emerald-gains)' : 'var(--coral-losses)';
 
                 return (
-                  <div key={holding.ticker} className="flex justify-between align-center" style={{
-                    padding: 'var(--space-3) 0',
-                    borderBottom: '1px solid var(--border-color)',
-                  }}>
-                    <div className="flex flex-col">
-                      <span style={{ fontWeight: 650, fontSize: '0.95rem' }}>{holding.ticker}</span>
-                      <span style={{ fontSize: '0.75rem', color: 'var(--ink-light)' }}>
-                        {holding.shares} Shares @ Avg {getCurrencySymbol(displayCurrency)}{holdingAvgPriceDisplay.toFixed(1)}
-                      </span>
+                  <div key={holding.ticker} style={{ padding: '10px 0', borderBottom: '1px solid var(--border-color)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                        <span style={{ fontWeight: 700, fontSize: '0.95rem' }}>{holding.ticker}</span>
+                        <span style={{ fontSize: '0.74rem', color: 'var(--ink-light)' }}>
+                          {holding.shares} sh · Avg {getCurrencySymbol(displayCurrency)}{holdingAvgPriceDisplay.toFixed(1)}
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <div style={{ textAlign: 'right' }}>
+                          <div className="num" style={{ fontWeight: 650, fontSize: '0.9rem' }}>
+                            {getCurrencySymbol(displayCurrency)}{holdingValueDisplay.toLocaleString('en-US', { maximumFractionDigits: 1 })}
+                          </div>
+                          <div className="num" style={{ fontSize: '0.74rem', color: returnColor, fontWeight: 600 }}>
+                            {holdingReturnRate >= 0 ? '+' : ''}{holdingReturnRate.toFixed(2)}%
+                          </div>
+                        </div>
+                        <button className="btn btn-secondary"
+                          style={{ padding: '3px 8px', fontSize: '0.72rem', color: 'var(--coral-losses)', borderColor: 'var(--coral-losses)' }}
+                          onClick={() => { setSelectedStock(stock); setTradeType('sell'); }}>
+                          Sell
+                        </button>
+                      </div>
                     </div>
-
-                    <div style={{ textAlign: 'right' }}>
-                      <div className="num" style={{ fontWeight: 600 }}>
-                        {getCurrencySymbol(displayCurrency)}{holdingValueDisplay.toLocaleString('en-US', { maximumFractionDigits: 1 })}
+                    {/* Allocation bar */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px' }}>
+                      <div style={{ flex: 1, height: '3px', background: 'var(--border-color)', borderRadius: '2px', overflow: 'hidden' }}>
+                        <div style={{ height: '100%', width: `${allocationPct}%`, background: returnColor, borderRadius: '2px', transition: 'width 0.6s ease' }} />
                       </div>
-                      <div className={`num ${holdingReturnRate >= 0 ? 'text-gain' : 'text-loss'}`} style={{ fontSize: '0.75rem' }}>
-                        {holdingReturnRate >= 0 ? '+' : ''}{holdingReturnRate.toFixed(2)}%
-                      </div>
+                      <span className="num" style={{ fontSize: '0.68rem', color: 'var(--ink-muted)', fontWeight: 600, minWidth: '30px', textAlign: 'right' }}>{allocationPct.toFixed(0)}%</span>
                     </div>
                   </div>
                 );
@@ -404,16 +432,21 @@ export const Investments: React.FC<InvestmentsProps> = ({
       </div>
 
       {/* Best practices feed */}
-      <div className="card flex flex-col gap-4">
-        <div className="flex align-center gap-2" style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: 'var(--space-3)' }}>
-          <BookOpen size={16} style={{ color: 'var(--ink-muted)' }} />
-          <span className="card-title" style={{ margin: 0 }}>Investment Principles Feed</span>
+      <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', borderBottom: '1px solid var(--border-color)', paddingBottom: 'var(--space-3)' }}>
+          <BookOpen size={15} style={{ color: 'var(--ink-muted)' }} />
+          <span className="card-title" style={{ margin: 0 }}>Investment Principles</span>
         </div>
-        <div className="grid grid-2 gap-6">
+        <div className="grid grid-2 gap-4">
           {PRINCIPLES.map((p, idx) => (
-            <div key={idx} className="flex flex-col gap-2" style={{ paddingRight: 'var(--space-2)' }}>
-              <h4 style={{ fontWeight: 600, fontSize: '0.98rem' }}>{p.title}</h4>
-              <p style={{ color: 'var(--ink-muted)', fontSize: '0.85rem', lineHeight: 1.4 }}>{p.body}</p>
+            <div key={idx} style={{ display: 'flex', gap: '12px', padding: '12px', background: 'var(--nav-pill-bg)', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
+              <div style={{ width: '22px', height: '22px', borderRadius: '50%', background: 'var(--emerald-gains-bg)', border: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: '0.7rem', fontWeight: 700, color: 'var(--emerald-gains)', marginTop: '1px' }}>
+                {idx + 1}
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <h4 style={{ fontWeight: 650, fontSize: '0.88rem', margin: 0, color: 'var(--ink-color)' }}>{p.title}</h4>
+                <p style={{ color: 'var(--ink-muted)', fontSize: '0.8rem', lineHeight: 1.5, margin: 0 }}>{p.body}</p>
+              </div>
             </div>
           ))}
         </div>
@@ -421,140 +454,96 @@ export const Investments: React.FC<InvestmentsProps> = ({
 
       {/* Trade Modal */}
       {selectedStock && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(10, 10, 10, 0.4)',
-          backdropFilter: 'blur(4px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 1000,
-          padding: 'var(--space-4)',
-        }}>
+        <div style={BACKDROP}>
+          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} onClick={() => setSelectedStock(null)} />
           <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            className="card"
-            style={{
-              width: '100%',
-              maxWidth: '400px',
-              backgroundColor: 'var(--card-bg)',
-              border: '1px solid var(--border-color)',
-              boxShadow: '0 20px 40px rgba(0,0,0,0.12)',
-            }}
+            initial={{ opacity: 0, scale: 0.95, y: 8 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 8 }}
+            transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+            style={MODAL_PANEL}
           >
-            <h3 className="serif-title" style={{ fontSize: '1.6rem', marginBottom: 'var(--space-2)' }}>
-              Trade {selectedStock.ticker}
-            </h3>
-            <p style={{ fontSize: '0.85rem', color: 'var(--ink-muted)', marginBottom: 'var(--space-4)' }}>
-              Current Price: {getCurrencySymbol(displayCurrency)}{priceInDisplay.toFixed(2)} 
-              {displayCurrency !== getStockCurrencyCode(selectedStock) && ` (${selectedStock.currency}${selectedStock.price.toFixed(2)})`}
-            </p>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.25rem' }}>
+              <div>
+                <h3 style={{ fontFamily: 'var(--font-sans)', fontSize: '1.4rem', fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--ink-color)', margin: 0 }}>
+                  {selectedStock.ticker}
+                </h3>
+                <p style={{ fontSize: '0.8rem', color: 'var(--ink-muted)', margin: '2px 0 0 0' }}>{selectedStock.name}</p>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{ textAlign: 'right' }}>
+                  <div className="num" style={{ fontWeight: 700, fontSize: '1.1rem', color: 'var(--ink-color)' }}>
+                    {getCurrencySymbol(displayCurrency)}{priceInDisplay.toFixed(2)}
+                  </div>
+                  <div className={`num ${selectedStock.changePercent >= 0 ? 'text-gain' : 'text-loss'}`} style={{ fontSize: '0.75rem', fontWeight: 600 }}>
+                    {selectedStock.changePercent >= 0 ? '+' : ''}{selectedStock.changePercent.toFixed(2)}%
+                  </div>
+                </div>
+                <button type="button" className="icon-btn" onClick={() => setSelectedStock(null)}><X size={16} /></button>
+              </div>
+            </div>
 
-            <form onSubmit={handleTradeSubmit} className="flex flex-col gap-4">
+            <form onSubmit={handleTradeSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              {/* Buy / Sell pill toggle */}
               <div className="input-group">
-                <label className="input-label">Action</label>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    className="btn"
-                    style={{
-                      flex: 1,
-                      backgroundColor: tradeType === 'buy' ? 'var(--ink-color)' : 'var(--nav-pill-bg)',
-                      color: tradeType === 'buy' ? 'var(--bg-color)' : 'var(--ink-color)',
-                      border: '1px solid var(--border-color)',
-                      fontSize: '0.85rem',
-                      padding: '8px 0',
-                    }}
-                    onClick={() => setTradeType('buy')}
-                  >
-                    Buy (Invest)
+                <label className="input-label">Order Type</label>
+                <div style={{ display: 'flex', background: 'var(--nav-pill-bg)', padding: '3px', borderRadius: '9999px', gap: '3px' }}>
+                  <button type="button" onClick={() => setTradeType('buy')}
+                    style={{ flex: 1, padding: '8px 0', borderRadius: '9999px', fontSize: '0.85rem', fontWeight: tradeType === 'buy' ? 650 : 500, border: 'none', cursor: 'pointer', transition: 'all 0.2s',
+                      background: tradeType === 'buy' ? 'var(--emerald-gains-bg)' : 'transparent',
+                      color: tradeType === 'buy' ? 'var(--emerald-gains)' : 'var(--ink-muted)' }}>
+                    Buy · Invest
                   </button>
-                  <button
-                    type="button"
-                    className="btn"
-                    style={{
-                      flex: 1,
-                      backgroundColor: tradeType === 'sell' ? 'var(--ink-color)' : 'var(--nav-pill-bg)',
-                      color: tradeType === 'sell' ? 'var(--bg-color)' : 'var(--ink-color)',
-                      border: '1px solid var(--border-color)',
-                      fontSize: '0.85rem',
-                      padding: '8px 0',
-                    }}
-                    onClick={() => setTradeType('sell')}
-                  >
-                    Sell (Liquidate)
+                  <button type="button" onClick={() => setTradeType('sell')}
+                    style={{ flex: 1, padding: '8px 0', borderRadius: '9999px', fontSize: '0.85rem', fontWeight: tradeType === 'sell' ? 650 : 500, border: 'none', cursor: 'pointer', transition: 'all 0.2s',
+                      background: tradeType === 'sell' ? 'var(--coral-losses-bg)' : 'transparent',
+                      color: tradeType === 'sell' ? 'var(--coral-losses)' : 'var(--ink-muted)' }}>
+                    Sell · Liquidate
                   </button>
                 </div>
               </div>
+
+              {tradeType === 'sell' && currentHolding && (
+                <div style={{ padding: '8px 12px', background: 'var(--nav-pill-bg)', border: '1px solid var(--border-color)', borderRadius: '10px', fontSize: '0.78rem', color: 'var(--ink-muted)' }}>
+                  You hold <span className="num" style={{ fontWeight: 700, color: 'var(--ink-color)' }}>{currentHolding.shares} shares</span> of {selectedStock.ticker}
+                </div>
+              )}
 
               <div className="input-group">
                 <label className="input-label">Number of Shares</label>
-                <input
-                  type="text"
-                  placeholder="e.g. 10"
-                  value={sharesInput}
+                <input type="text" placeholder="e.g. 10" value={sharesInput}
                   onChange={(e) => setSharesInput(e.target.value.replace(/[^0-9.]/g, ''))}
-                  className="input-field num-input"
-                  style={{
-                    backgroundColor: 'var(--bg-color)',
-                    color: 'var(--ink-color)',
-                    border: '1px solid var(--border-color)',
-                  }}
-                  required
-                  autoFocus
-                />
+                  className="input-field num-input" required autoFocus />
               </div>
 
-              <div className="flex flex-col gap-1" style={{ fontSize: '0.85rem', padding: 'var(--space-2) 0' }}>
-                <div className="flex justify-between">
-                  <span style={{ color: 'var(--ink-muted)' }}>Estimated Value</span>
-                  <span className="num" style={{ fontWeight: 600 }}>
+              {/* Order summary */}
+              <div style={{ background: 'var(--nav-pill-bg)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: '5px', fontSize: '0.82rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: 'var(--ink-muted)' }}>Order value</span>
+                  <span className="num" style={{ fontWeight: 650, color: 'var(--ink-color)' }}>
                     {getCurrencySymbol(displayCurrency)}{totalCostDisplay.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </span>
                 </div>
-                <div className="flex justify-between">
-                  <span style={{ color: 'var(--ink-muted)' }}>Cash Balance</span>
-                  <span className="num" style={{ fontWeight: 600 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: 'var(--ink-muted)' }}>Cash available</span>
+                  <span className="num" style={{ fontWeight: 650, color: 'var(--ink-color)' }}>
                     {getCurrencySymbol(displayCurrency)}{displayBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    {displayCurrency !== 'MUR' && ` (~Rs. ${generalBalance.toLocaleString()})`}
+                    {displayCurrency !== 'MUR' && <span style={{ color: 'var(--ink-muted)', fontWeight: 400 }}> · Rs. {generalBalance.toLocaleString()}</span>}
                   </span>
                 </div>
               </div>
 
               {hasError && (
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  backgroundColor: 'var(--coral-losses-bg)',
-                  border: '1px solid rgba(232, 93, 93, 0.2)',
-                  padding: '12px',
-                  borderRadius: '8px',
-                  color: 'var(--coral-losses)',
-                  fontSize: '0.85rem',
-                  marginTop: 'var(--space-2)'
-                }}>
-                  <AlertCircle size={16} style={{ flexShrink: 0 }} />
-                  <span>
-                    {isOverdraft 
-                      ? "Insufficient general cash balance." 
-                      : "You do not own enough shares to sell."}
-                  </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'var(--coral-losses-bg)', border: '1px solid var(--coral-losses)', padding: '10px 12px', borderRadius: '10px', color: 'var(--coral-losses)', fontSize: '0.82rem' }}>
+                  <AlertCircle size={14} style={{ flexShrink: 0 }} />
+                  <span>{isOverdraft ? 'Insufficient cash balance for this order.' : 'You don\'t have enough shares to sell.'}</span>
                 </div>
               )}
 
-              <div className="flex justify-between" style={{ marginTop: 'var(--space-4)' }}>
-                <button type="button" className="btn btn-secondary" onClick={() => setSelectedStock(null)}>
-                  Cancel
-                </button>
-                <button type="submit" className="btn btn-primary" disabled={!sharesInput || shares <= 0 || hasError}>
-                  Confirm Order
+              <div style={{ display: 'flex', gap: '8px', marginTop: '0.25rem' }}>
+                <button type="button" className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setSelectedStock(null)}>Cancel</button>
+                <button type="submit" className="btn btn-primary" style={{ flex: 2 }} disabled={!sharesInput || shares <= 0 || hasError}>
+                  {tradeType === 'buy' ? 'Confirm Buy' : 'Confirm Sell'}
                 </button>
               </div>
             </form>

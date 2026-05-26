@@ -1,8 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { motion, useMotionValue, useTransform, animate } from 'framer-motion';
-import { ArrowUpRight, ArrowDownRight, Plus, Calendar, TrendingUp, Edit2, ChevronDown, Search, Wallet, PiggyBank, Info, Camera, Loader2, AlertCircle } from 'lucide-react';
+import {
+  ArrowUpRight, ArrowDownRight, Plus, Calendar, TrendingUp, Edit2,
+  ChevronDown, Search, Wallet, PiggyBank, Info, Camera, Loader2, AlertCircle,
+} from 'lucide-react';
 import { createWorker } from 'tesseract.js';
 import { parseReceiptText } from '../utils/receiptParser';
+import { cn } from '../utils/cn';
 
 interface Transaction {
   id: string;
@@ -39,24 +43,31 @@ interface DashboardProps {
   loggedToday?: boolean;
 }
 
-// Custom Motion Count-up Component
-const AnimatedNumber: React.FC<{ value: number }> = ({ value }) => {
-  const count = useMotionValue(0);
-  const rounded = useTransform(count, (latest) => 
-    Math.round(latest).toLocaleString('en-US')
-  );
-
-  useEffect(() => {
-    const controls = animate(count, value, {
-      duration: 1.8,
-      ease: [0.16, 1, 0.3, 1], // Slow, confident easing
-    });
-    return controls.stop;
-  }, [value, count]);
-
-  return <motion.span className="num">{rounded}</motion.span>;
+// ── Shared style helpers ────────────────────────────────────────────────────
+const MODAL_STYLE: React.CSSProperties = {
+  position: 'fixed', inset: 0 as any,
+  background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
+  display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '1rem',
+};
+const MODAL_CARD: React.CSSProperties = {
+  background: 'var(--card-bg)', border: '1px solid var(--border-color)',
+  borderRadius: '1.5rem', padding: '1.5rem', width: '100%',
 };
 
+// ── Animated count-up ───────────────────────────────────────────────────────
+const AnimatedNumber: React.FC<{ value: number }> = ({ value }) => {
+  const count = useMotionValue(0);
+  const rounded = useTransform(count, (latest) =>
+    Math.round(latest).toLocaleString('en-US')
+  );
+  useEffect(() => {
+    const controls = animate(count, value, { duration: 1.8, ease: [0.16, 1, 0.3, 1] });
+    return controls.stop;
+  }, [value, count]);
+  return <motion.span className="tabular-nums">{rounded}</motion.span>;
+};
+
+// ── Main component ──────────────────────────────────────────────────────────
 export const Dashboard: React.FC<DashboardProps> = ({
   income,
   balance,
@@ -75,77 +86,50 @@ export const Dashboard: React.FC<DashboardProps> = ({
   streak = 0,
   loggedToday = false,
 }) => {
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [desc, setDesc] = useState('');
-  const [amount, setAmount] = useState('');
-  const [type, setType] = useState<'income' | 'expense'>('expense');
-  const [category, setCategory] = useState('');
-  const [splitWithPartner, setSplitWithPartner] = useState(false);
+  // ── Modal / form state ────────────────────────────────────────────────────
+  const [showAddModal, setShowAddModal]           = useState(false);
+  const [desc, setDesc]                           = useState('');
+  const [amount, setAmount]                       = useState('');
+  const [type, setType]                           = useState<'income' | 'expense'>('expense');
+  const [category, setCategory]                   = useState('');
+  const [splitWithPartner, setSplitWithPartner]   = useState(false);
+  const [showAdjustModal, setShowAdjustModal]     = useState(false);
+  const [newBalanceInput, setNewBalanceInput]     = useState('');
+  const [showSafeToSpendModal, setShowSafeToSpendModal] = useState(false);
+  const [dropdownOpen, setDropdownOpen]           = useState(false);
+  const [searchQuery, setSearchQuery]             = useState('');
+  const [isScanning, setIsScanning]               = useState(false);
+  const [scanProgress, setScanProgress]           = useState(0);
+  const [scanError, setScanError]                 = useState('');
 
   useEffect(() => {
-    if (!showAddModal) {
-      setSplitWithPartner(false);
-    }
+    if (!showAddModal) setSplitWithPartner(false);
   }, [showAddModal]);
 
-  // Listen for quick-log event from PWA shortcut / notification tap
   useEffect(() => {
     const handler = () => setShowAddModal(true);
     window.addEventListener('lumen:open-quick-log', handler);
     return () => window.removeEventListener('lumen:open-quick-log', handler);
   }, []);
 
-  // Balance adjust modal states
-  const [showAdjustModal, setShowAdjustModal] = useState(false);
-  const [newBalanceInput, setNewBalanceInput] = useState('');
-
-  // Safe to Spend modal state
-  const [showSafeToSpendModal, setShowSafeToSpendModal] = useState(false);
-
-  // Category select dropdown states
-  const [dropdownOpen, setDropdownOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-
-  // OCR Scan States
-  const [isScanning, setIsScanning] = useState(false);
-  const [scanProgress, setScanProgress] = useState(0);
-  const [scanError, setScanError] = useState('');
-
+  // ── OCR receipt scan ──────────────────────────────────────────────────────
   const handleReceiptScan = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
-    setIsScanning(true);
-    setScanProgress(0);
-    setScanError('');
-
+    setIsScanning(true); setScanProgress(0); setScanError('');
     try {
       const worker = await createWorker('eng', 1, {
-        logger: m => {
-          if (m.status === 'recognizing text') {
-            setScanProgress(Math.round(m.progress * 100));
-          }
-        }
+        logger: m => { if (m.status === 'recognizing text') setScanProgress(Math.round(m.progress * 100)); },
       });
-
       const { data: { text } } = await worker.recognize(file);
       await worker.terminate();
-
-      if (!text || text.trim() === '') {
-        throw new Error('No readable text detected in receipt.');
-      }
-
+      if (!text || text.trim() === '') throw new Error('No readable text detected in receipt.');
       const parsed = parseReceiptText(text);
-
       setDesc(parsed.description);
-      if (parsed.amount > 0) {
-        handleCurrencyChange(parsed.amount.toString(), setAmount);
-      } else {
-        setAmount('');
-      }
+      if (parsed.amount > 0) handleCurrencyChange(parsed.amount.toString(), setAmount);
+      else setAmount('');
       setType('expense');
       setCategory(parsed.category);
-
     } catch (err: any) {
       console.error('OCR Error:', err);
       setScanError(err.message || 'Scanning failed. Please enter details manually.');
@@ -154,108 +138,72 @@ export const Dashboard: React.FC<DashboardProps> = ({
     }
   };
 
-  // Helper to format currency user input with commas
+  // ── Currency input formatter ──────────────────────────────────────────────
   const handleCurrencyChange = (value: string, setter: (val: string) => void) => {
     const clean = value.replace(/[^0-9.]/g, '');
     const parts = clean.split('.');
-    if (parts.length > 2) return; // ignore multiple decimals
-    
-    // Add thousands separators to the integer part
+    if (parts.length > 2) return;
     const formattedInt = parts[0] ? parseInt(parts[0], 10).toLocaleString('en-US') : '';
     const formatted = parts[1] !== undefined ? `${formattedInt}.${parts[1].slice(0, 2)}` : formattedInt;
-    
     setter(clean === '' ? '' : formatted);
   };
 
-  // Calculate totals
-  const totalIn = transactions.filter(t => t.type === 'income').reduce((acc, t) => acc + t.amount, 0);
-  const totalOut = transactions.filter(t => t.type === 'expense').reduce((acc, t) => acc + t.amount, 0);
+  // ── Transaction totals ────────────────────────────────────────────────────
+  const totalIn  = transactions.filter(t => t.type === 'income').reduce((a, t) => a + t.amount, 0);
+  const totalOut = transactions.filter(t => t.type === 'expense').reduce((a, t) => a + t.amount, 0);
 
-  // 1. Calculate billing cycle boundary (from 26th of last month to 25th of current month, or 26th of this month to 25th of next month)
+  // ── Billing-cycle range (26th → 25th) ────────────────────────────────────
   const getCurrentCycleRange = () => {
     const now = new Date();
-    const year = now.getFullYear();
-    const month = now.getMonth(); // 0-indexed
-    const day = now.getDate();
-
-    let startYear = year;
-    let startMonth = month;
-    let endYear = year;
-    let endMonth = month;
-
+    const year = now.getFullYear(), month = now.getMonth(), day = now.getDate();
+    let startYear = year, startMonth = month, endYear = year, endMonth = month;
     if (day >= 26) {
-      startMonth = month;
-      endMonth = month + 1;
-      if (endMonth > 11) {
-        endMonth = 0;
-        endYear += 1;
-      }
+      startMonth = month; endMonth = month + 1;
+      if (endMonth > 11) { endMonth = 0; endYear += 1; }
     } else {
       startMonth = month - 1;
-      if (startMonth < 0) {
-        startMonth = 11;
-        startYear -= 1;
-      }
+      if (startMonth < 0) { startMonth = 11; startYear -= 1; }
       endMonth = month;
     }
-
-    const startDate = new Date(startYear, startMonth, 26, 0, 0, 0);
-    const endDate = new Date(endYear, endMonth, 25, 23, 59, 59);
-
-    return { startDate, endDate, startMonth, startYear };
+    return {
+      startDate: new Date(startYear, startMonth, 26, 0, 0, 0),
+      endDate:   new Date(endYear,   endMonth,   25, 23, 59, 59),
+      startMonth,
+    };
   };
 
   const { startDate, endDate, startMonth } = getCurrentCycleRange();
+  const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const currentCycleLabel = `${monthNames[startMonth]} 26 – ${monthNames[endDate.getMonth()]} 25`;
 
-  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  const currentCycleLabel = `${monthNames[startMonth]} 26 - ${monthNames[endDate.getMonth()]} 25`;
-
-  // 2. Filter transactions that fell into the current cycle
   const currentCycleTransactions = transactions.filter(t => {
-    const tDate = new Date(t.date);
-    return tDate >= startDate && tDate <= endDate;
+    const d = new Date(t.date); return d >= startDate && d <= endDate;
   });
 
-  // Calculate daily variable expenses in this cycle
-  const loggedExpensesThisCycle = currentCycleTransactions
-    .filter(t => t.type === 'expense')
-    .reduce((acc, t) => acc + t.amount, 0);
+  const loggedExpensesThisCycle   = currentCycleTransactions.filter(t => t.type === 'expense').reduce((a, t) => a + t.amount, 0);
+  const loggedInflowsThisCycle    = currentCycleTransactions.filter(t => t.type === 'income').reduce((a, t) => a + t.amount, 0);
+  const recurringInflowsThisCycle = currentCycleTransactions.filter(t => t.type === 'income' && /base|salary|transport/i.test(t.description)).reduce((a, t) => a + t.amount, 0);
+  const extraInflowsThisCycle     = Math.max(0, loggedInflowsThisCycle - recurringInflowsThisCycle);
+  const totalInflowForCycle       = income + extraInflowsThisCycle;
+  const startingDisposablePool    = Math.max(0, totalInflowForCycle - recurringExpenses - savingsTargetsSum);
+  const safeToSpend               = startingDisposablePool - loggedExpensesThisCycle;
 
-  // Calculate manual inflows logged in this cycle
-  const loggedInflowsThisCycle = currentCycleTransactions
-    .filter(t => t.type === 'income')
-    .reduce((acc, t) => acc + t.amount, 0);
-
-  // Avoid double counting salary if already logged in currentCycleTransactions
-  const recurringInflowsThisCycle = currentCycleTransactions
-    .filter(t => t.type === 'income' && /base|salary|transport/i.test(t.description))
-    .reduce((acc, t) => acc + t.amount, 0);
-
-  const extraInflowsThisCycle = Math.max(0, loggedInflowsThisCycle - recurringInflowsThisCycle);
-  const totalInflowForCycle = income + extraInflowsThisCycle;
-
-  // Safe to Spend calculations
-  const startingDisposablePool = Math.max(0, totalInflowForCycle - recurringExpenses - savingsTargetsSum);
-  const safeToSpend = startingDisposablePool - loggedExpensesThisCycle;
-
-  const nowTime = new Date();
+  const nowTime       = new Date();
   const daysRemaining = Math.max(1, Math.ceil((endDate.getTime() - nowTime.getTime()) / (1000 * 60 * 60 * 24)));
   const dailyAllowance = Math.round(Math.max(0, safeToSpend) / daysRemaining);
-  
-  // Suggested categories based on type
-  const categories = type === 'income' 
+
+  // ── Form helpers ──────────────────────────────────────────────────────────
+  const categories = type === 'income'
     ? ['Salary', 'Freelance', 'Investments', 'Other In']
     : ['Rent & Housing', 'Groceries', 'Utilities', 'Dining Out', 'Leisure', 'Transport', 'Other Out'];
 
   useEffect(() => {
-    if (categories.length > 0 && !category) {
-      setCategory(categories[0]);
-    }
+    if (categories.length > 0 && !category) setCategory(categories[0]);
   }, [type, category]);
 
   const handleTypeChange = (newType: 'income' | 'expense') => {
     setType(newType);
-    const defaultCats = newType === 'income' 
+    const defaultCats = newType === 'income'
       ? ['Salary', 'Freelance', 'Investments', 'Other In']
       : ['Rent & Housing', 'Groceries', 'Utilities', 'Dining Out', 'Leisure', 'Transport', 'Other Out'];
     setCategory(defaultCats[0]);
@@ -266,36 +214,46 @@ export const Dashboard: React.FC<DashboardProps> = ({
     e.preventDefault();
     if (!desc || !amount) return;
     const parsedAmount = parseFloat(amount.replace(/,/g, '')) || 0;
-    
     if (splitWithPartner && partnerProfile) {
       onAddTransaction(desc, parsedAmount, type, category, partnerProfile.id, parsedAmount / 2);
     } else {
       onAddTransaction(desc, parsedAmount, type, category);
     }
-    
-    setDesc('');
-    setAmount('');
-    setSearchQuery('');
-    setSplitWithPartner(false);
-    setShowAddModal(false);
+    setDesc(''); setAmount(''); setSearchQuery(''); setSplitWithPartner(false); setShowAddModal(false);
   };
 
   const handleSaveBalanceAdjust = (e: React.FormEvent) => {
     e.preventDefault();
-    const parsedBalance = parseFloat(newBalanceInput.replace(/,/g, '')) || 0;
-    onUpdateGeneralBalance(parsedBalance);
+    onUpdateGeneralBalance(parseFloat(newBalanceInput.replace(/,/g, '')) || 0);
     setShowAdjustModal(false);
   };
 
   const getGoalLabel = (g: string) => {
-    switch (g) {
-      case 'save': return 'Save Money';
-      case 'invest': return 'Grow Investments';
-      case 'debt': return 'Pay Off Debt';
-      case 'wealth': return 'Build Wealth';
-      default: return 'Finance Focus';
-    }
+    const map: Record<string, string> = { save: 'Save Money', invest: 'Grow Investments', debt: 'Pay Off Debt', wealth: 'Build Wealth' };
+    return map[g] ?? 'Finance Focus';
   };
+
+  const spendStatusText = safeToSpend > 5000
+    ? 'Your spending is well within safe boundaries.'
+    : safeToSpend > 0
+      ? 'Approaching budget limits. Spend cautiously.'
+      : 'You have exceeded your safe spending limit.';
+
+  // ── Streak chip style ─────────────────────────────────────────────────────
+  const streakChipCls = cn(
+    'streak-chip',
+    streak >= 7 ? 'mega' : streak >= 2 ? 'active' : loggedToday ? 'today' : 'zero',
+  );
+
+  // ── Asset badge rows ──────────────────────────────────────────────────────
+  const assetBadges = [
+    { label: 'Cash',    val: generalBalance,    colorClass: 'text-white',       icon: <Wallet size={11} />,    onClick: () => { setNewBalanceInput(generalBalance.toLocaleString('en-US')); setShowAdjustModal(true); } },
+    { label: 'Savings', val: totalBucketSavings, colorClass: 'text-emerald-400', icon: <PiggyBank size={11} />, onClick: () => onNavigate?.('savings') },
+    { label: 'Stocks',  val: holdingsValue,      colorClass: 'text-blue-400',    icon: <TrendingUp size={11} />,onClick: () => onNavigate?.('investments') },
+  ];
+
+  // ══════════════════════════════════════════════════════════════════════════
+  const spendColorStyle = safeToSpend > 5000 ? 'var(--emerald-gains)' : safeToSpend > 0 ? '#D97706' : 'var(--coral-losses)';
 
   return (
     <motion.div
@@ -303,1023 +261,528 @@ export const Dashboard: React.FC<DashboardProps> = ({
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -15 }}
       transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-      className="flex flex-col gap-6 mobile-dashboard-container"
+      style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', paddingBottom: '1rem' }}
     >
-      {/* Hero Net Worth Section */}
-      <div className="card hero-card" style={{
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        textAlign: 'center',
-        gap: 'var(--space-2)',
-        position: 'relative',
-        zIndex: 1,
-      }}>
-        {/* Soft emerald pulse glow positioned directly behind the hero net worth */}
-        <div style={{
-          position: 'absolute',
-          top: '50%',
-          left: '50%',
-          transform: 'translate(-50%, -50%)',
-          width: '250px',
-          height: '150px',
-          background: 'radial-gradient(circle, rgba(15, 122, 92, 0.05) 0%, rgba(255, 255, 255, 0) 70%)',
-          pointerEvents: 'none',
-          zIndex: -1,
-        }} />
-        
-        <div className="flex align-center justify-center gap-2" style={{ position: 'relative', width: '100%' }}>
-          <span className="card-title" style={{ margin: 0 }}>NET WORTH</span>
-          <button 
-            type="button" 
-            onClick={() => {
-              setNewBalanceInput(generalBalance.toLocaleString('en-US'));
-              setShowAdjustModal(true);
-            }}
-            style={{
-              background: 'none',
-              border: 'none',
-              padding: '2px',
-              cursor: 'pointer',
-              color: 'var(--ink-muted)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              opacity: 0.6,
-              transition: 'opacity 0.2s',
-            }}
-            onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
-            onMouseLeave={(e) => e.currentTarget.style.opacity = '0.6'}
+
+      {/* ══ Hero — Net Worth ════════════════════════════════════════════════ */}
+      <div className="card" style={{ padding: '2.5rem 2rem', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
+        {/* Label + edit */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <span className="card-title" style={{ margin: 0 }}>Net Worth</span>
+          <button
+            type="button"
+            onClick={() => { setNewBalanceInput(generalBalance.toLocaleString('en-US')); setShowAdjustModal(true); }}
             title="Adjust Available Cash"
+            className="icon-btn"
+            style={{ width: '22px', height: '22px', flexShrink: 0 }}
           >
-            <Edit2 size={12} />
+            <Edit2 size={11} />
           </button>
         </div>
-        <div className="flex align-baseline justify-center gap-1" style={{ color: 'var(--ink-color)', fontFamily: 'var(--font-sans)' }}>
-          <span style={{ fontSize: '1.8rem', fontWeight: 500, color: 'var(--ink-light)', alignSelf: 'flex-start', marginTop: '6px' }}>
-            Rs.
-          </span>
-          <h1 className="hero-num" style={{ margin: 0 }}>
+
+        {/* Animated amount */}
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', justifyContent: 'center' }}>
+          <span style={{ fontSize: '1.1rem', fontWeight: 500, color: 'var(--ink-muted)', alignSelf: 'flex-start', marginTop: '0.6rem' }}>Rs.</span>
+          <h1 className="num" style={{ fontSize: 'clamp(3rem, 8vw, 4.5rem)', fontWeight: 700, letterSpacing: '-0.05em', color: 'var(--ink-color)', lineHeight: 1 }}>
             <AnimatedNumber value={balance} />
           </h1>
         </div>
-        <div className="flex align-center justify-center gap-2 flex-wrap" style={{ marginTop: 'var(--space-2)' }}>
-          <span className="badge badge-gain">
-            <TrendingUp size={12} style={{ marginRight: '4px' }} /> Focus: {getGoalLabel(goal)}
+
+        {/* Badges row */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', justifyContent: 'center' }}>
+          <span className="badge badge-gain" style={{ gap: '4px' }}>
+            <TrendingUp size={11} /> {getGoalLabel(goal)}
           </span>
-          {/* Streak chip */}
           <button
             type="button"
-            className={`streak-chip ${streak >= 7 ? 'mega' : streak >= 2 ? 'active' : loggedToday ? 'today' : 'zero'}`}
             onClick={() => setShowAddModal(true)}
-            title={streak >= 2 ? `${streak}-day logging streak! Keep it up.` : loggedToday ? 'Logged today — great job!' : 'Log a transaction to start your streak'}
+            title={streak >= 2 ? `${streak}-day logging streak!` : loggedToday ? 'Logged today!' : 'Log a transaction'}
+            className={streakChipCls}
           >
-            {streak >= 2 ? (
-              <>{streak >= 7 ? '🔥' : '🔥'} {streak}d streak</>
-            ) : loggedToday ? (
-              <>✅ Logged today</>
-            ) : (
-              <>+ Log today</>
-            )}
+            {streak >= 2 ? <>{streak >= 7 ? '🔥' : '🔥'} {streak}d streak</> : loggedToday ? <>✅ Logged today</> : <>+ Log today</>}
           </button>
         </div>
 
-        {/* Horizontal Stacked Bar representing asset allocations */}
+        {/* Asset allocation bar */}
         {balance > 0 && (
-          <div style={{
-            width: '100%',
-            maxWidth: '100%',
-            height: '10px',
-            backgroundColor: 'rgba(128, 128, 128, 0.08)',
-            borderRadius: '9999px',
-            overflow: 'hidden',
-            display: 'flex',
-            marginTop: '16px',
-            marginBottom: '4px',
-          }}>
-            <div style={{
-              height: '100%',
-              backgroundColor: 'var(--ink-color)', // dark ink for bank cash
-              width: `${(generalBalance / balance) * 100}%`,
-              transition: 'width 0.8s cubic-bezier(0.16, 1, 0.3, 1)',
-            }} title={`Cash: ${Math.round((generalBalance / balance) * 100)}%`} />
-            <div style={{
-              height: '100%',
-              backgroundColor: 'var(--emerald-gains)', // emerald green for savings
-              width: `${(totalBucketSavings / balance) * 100}%`,
-              transition: 'width 0.8s cubic-bezier(0.16, 1, 0.3, 1)',
-            }} title={`Savings: ${Math.round((totalBucketSavings / balance) * 100)}%`} />
-            <div style={{
-              height: '100%',
-              backgroundColor: '#3B82F6', // Blue for investments
-              width: `${(holdingsValue / balance) * 100}%`,
-              transition: 'width 0.8s cubic-bezier(0.16, 1, 0.3, 1)',
-            }} title={`Investments: ${Math.round((holdingsValue / balance) * 100)}%`} />
+          <div style={{ width: '100%', maxWidth: '360px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <div style={{ height: '6px', borderRadius: '3px', background: 'var(--border-color)', overflow: 'hidden', display: 'flex' }}>
+              <div style={{ width: `${(generalBalance / balance) * 100}%`, background: 'var(--ink-color)', transition: 'width 0.7s ease' }} title={`Cash: ${Math.round((generalBalance / balance) * 100)}%`} />
+              <div style={{ width: `${(totalBucketSavings / balance) * 100}%`, background: 'var(--emerald-gains)', transition: 'width 0.7s ease' }} title={`Savings: ${Math.round((totalBucketSavings / balance) * 100)}%`} />
+              <div style={{ width: `${(holdingsValue / balance) * 100}%`, background: '#3B82F6', transition: 'width 0.7s ease' }} title={`Investments: ${Math.round((holdingsValue / balance) * 100)}%`} />
+            </div>
           </div>
         )}
 
-        {/* Clickable glassmorphic badges */}
-        <div className="flex gap-2 justify-center flex-wrap" style={{ marginTop: '12px', width: '100%', maxWidth: '600px' }}>
-          {[
-            {
-              label: 'Cash',
-              val: generalBalance,
-              color: 'var(--ink-color)',
-              icon: <Wallet size={12} />,
-              onClick: () => {
-                setNewBalanceInput(generalBalance.toLocaleString('en-US'));
-                setShowAdjustModal(true);
-              },
-            },
-            {
-              label: 'Savings',
-              val: totalBucketSavings,
-              color: 'var(--emerald-gains)',
-              icon: <PiggyBank size={12} />,
-              onClick: () => onNavigate && onNavigate('savings'),
-            },
-            {
-              label: 'Stocks',
-              val: holdingsValue,
-              color: '#3B82F6',
-              icon: <TrendingUp size={12} />,
-              onClick: () => onNavigate && onNavigate('investments'),
-            }
-          ].map((item, idx) => (
+        {/* Asset pills */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', justifyContent: 'center' }}>
+          {assetBadges.map((b, i) => (
             <button
-              key={idx}
+              key={i}
               type="button"
-              onClick={item.onClick}
+              onClick={b.onClick}
               style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '5px',
-                padding: '5px 10px',
-                borderRadius: '20px',
-                backgroundColor: 'rgba(128, 128, 128, 0.06)',
-                border: '1px solid var(--border-color)',
-                fontSize: '0.74rem',
-                color: 'var(--ink-muted)',
-                cursor: 'pointer',
-                transition: 'all 0.2s ease',
-                whiteSpace: 'nowrap',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = 'rgba(128, 128, 128, 0.12)';
-                e.currentTarget.style.borderColor = item.color;
-                e.currentTarget.style.transform = 'translateY(-1px)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = 'rgba(128, 128, 128, 0.06)';
-                e.currentTarget.style.borderColor = 'var(--border-color)';
-                e.currentTarget.style.transform = 'translateY(0)';
+                display: 'inline-flex', alignItems: 'center', gap: '5px',
+                padding: '5px 12px', borderRadius: '9999px',
+                background: 'var(--nav-pill-bg)', border: '1px solid var(--border-color)',
+                fontSize: '0.78rem', color: 'var(--ink-muted)', cursor: 'pointer',
+                transition: 'all 0.2s ease', whiteSpace: 'nowrap',
               }}
             >
-              <span style={{ color: item.color, display: 'flex', alignItems: 'center' }}>
-                {item.icon}
-              </span>
-              <span>{item.label}:</span>
-              <span className="num" style={{ fontWeight: 650, color: 'var(--ink-color)' }}>
-                Rs. {item.val.toLocaleString('en-US')}
-              </span>
+              <span style={{ color: i === 0 ? 'var(--ink-color)' : i === 1 ? 'var(--emerald-gains)' : '#3B82F6' }}>{b.icon}</span>
+              <span>{b.label}:</span>
+              <span className="num" style={{ fontWeight: 600, color: i === 0 ? 'var(--ink-color)' : i === 1 ? 'var(--emerald-gains)' : '#3B82F6' }}>Rs. {b.val.toLocaleString('en-US')}</span>
             </button>
           ))}
         </div>
       </div>
 
-      {/* Safe to Spend Card */}
-      <div className="card flex flex-col justify-between" style={{
-        position: 'relative',
-        overflow: 'hidden',
-        minHeight: '200px',
-        gap: 'var(--space-4)',
-      }}>
-        {/* Soft warning/danger/success aura glow behind the card */}
-        <div style={{
-          position: 'absolute',
-          top: '-20%',
-          right: '-10%',
-          width: '180px',
-          height: '180px',
-          background: safeToSpend > 5000 
-            ? 'radial-gradient(circle, rgba(15, 122, 92, 0.04) 0%, rgba(255, 255, 255, 0) 70%)'
-            : safeToSpend > 0 
-              ? 'radial-gradient(circle, rgba(234, 179, 8, 0.04) 0%, rgba(255, 255, 255, 0) 70%)'
-              : 'radial-gradient(circle, rgba(239, 68, 68, 0.04) 0%, rgba(255, 255, 255, 0) 70%)',
-          pointerEvents: 'none',
-          zIndex: 0,
-        }} />
+      {/* ══ Safe to Spend + Savings Rate ════════════════════════════════════ */}
+      <div className="grid grid-2 gap-4">
 
-        <div className="flex justify-between align-center" style={{ zIndex: 1, width: '100%' }}>
-          <div className="flex align-center gap-2">
-            <span className="card-title" style={{ margin: 0, fontSize: '0.78rem', letterSpacing: '0.05em' }}>SAFE TO SPEND THIS MONTH</span>
-            <button
-              type="button"
-              onClick={() => setShowSafeToSpendModal(true)}
-              style={{
-                background: 'none',
-                border: 'none',
-                padding: '2px',
-                cursor: 'pointer',
-                color: 'var(--ink-muted)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                opacity: 0.6,
-                transition: 'opacity 0.2s',
-              }}
-              onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
-              onMouseLeave={(e) => e.currentTarget.style.opacity = '0.6'}
-            >
-              <Info size={14} />
-            </button>
-          </div>
-          <span style={{ fontSize: '0.78rem', color: 'var(--ink-muted)', fontWeight: 500 }}>
-            Cycle: {currentCycleLabel}
-          </span>
-        </div>
-
-        <div className="flex justify-between align-center" style={{ zIndex: 1, width: '100%' }}>
+        {/* Safe to Spend */}
+        <div className="card flex flex-col justify-between" style={{ minHeight: '200px' }}>
           <div>
-            <h2 className="num" style={{
-              fontSize: '2.4rem',
-              fontWeight: 400,
-              letterSpacing: '-0.03em',
-              lineHeight: 1,
-              color: safeToSpend > 5000 ? 'var(--ink-color)' : safeToSpend > 0 ? '#CA8A04' : 'var(--coral-losses)'
-            }}>
-              Rs. {safeToSpend.toLocaleString('en-US')}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                <span className="card-title" style={{ margin: 0 }}>Safe to Spend</span>
+                <button type="button" onClick={() => setShowSafeToSpendModal(true)} className="icon-btn" style={{ width: '20px', height: '20px' }}>
+                  <Info size={11} />
+                </button>
+              </div>
+              <span style={{ fontSize: '0.72rem', color: 'var(--ink-light)' }}>{currentCycleLabel}</span>
+            </div>
+            <h2 className="num" style={{ fontSize: 'clamp(1.8rem, 5vw, 2.5rem)', fontWeight: 600, color: spendColorStyle, letterSpacing: '-0.03em', lineHeight: 1 }}>
+              Rs. <AnimatedNumber value={Math.max(0, safeToSpend)} />
             </h2>
-            <p style={{ color: 'var(--ink-muted)', fontSize: '0.8rem', marginTop: '6px' }}>
-              {safeToSpend > 5000 
-                ? 'Your spending is well within safe boundaries.' 
-                : safeToSpend > 0 
-                  ? 'Approaching budget limits. Spend cautiously.' 
-                  : 'You have exceeded your safe spending limit.'}
-            </p>
+            <p style={{ fontSize: '0.8rem', color: 'var(--ink-muted)', marginTop: '0.5rem' }}>{spendStatusText}</p>
           </div>
-
-          <div style={{ textAlign: 'right' }}>
-            <span style={{ fontSize: '0.75rem', color: 'var(--ink-muted)' }}>Daily Allowance</span>
-            <h4 className="num" style={{ fontSize: '1.25rem', fontWeight: 600, color: 'var(--ink-color)', marginTop: '2px' }}>
-              Rs. {dailyAllowance.toLocaleString('en-US')}/day
-            </h4>
-            <span style={{ fontSize: '0.72rem', color: 'var(--ink-muted)' }}>
-              for {daysRemaining} {daysRemaining === 1 ? 'day' : 'days'} left
-            </span>
-          </div>
-        </div>
-
-        {/* Progress bar representing remaining budget */}
-        {startingDisposablePool > 0 && (
-          <div style={{
-            width: '100%',
-            height: '10px',
-            backgroundColor: 'rgba(128, 128, 128, 0.08)',
-            borderRadius: '9999px',
-            overflow: 'hidden',
-            zIndex: 1,
-          }}>
-            <div style={{
-              height: '100%',
-              backgroundColor: safeToSpend > 5000 
-                ? 'var(--emerald-gains)' 
-                : safeToSpend > 0 
-                  ? '#EAB308' 
-                  : 'var(--coral-losses)',
-              width: `${Math.max(0, Math.min(100, (safeToSpend / startingDisposablePool) * 100))}%`,
-              transition: 'width 0.8s cubic-bezier(0.16, 1, 0.3, 1)',
-              borderRadius: '9999px',
-            }} />
-          </div>
-        )}
-      </div>
-
-      {/* Cash Flow and Savings rate Grid */}
-      <div className="grid grid-2 gap-6">
-        {/* Monthly Cash Flow Card */}
-        <div className="card flex flex-col justify-between" style={{ minHeight: '220px' }}>
           <div>
-            <div className="card-title">Monthly Cash Flow</div>
-            <div className="flex justify-between align-center" style={{ marginBottom: 'var(--space-6)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '0.75rem', borderTop: '1px solid var(--border-color)', marginTop: '0.75rem' }}>
               <div>
-                <span style={{ fontSize: '0.85rem', color: 'var(--ink-muted)' }}>Inflow</span>
-                <h3 className="num" style={{ fontSize: '1.25rem', fontWeight: 600 }}>Rs. {(income + totalIn).toLocaleString('en-US')}</h3>
+                <p style={{ fontSize: '0.7rem', color: 'var(--ink-light)', marginBottom: '2px' }}>Daily Allowance</p>
+                <p className="num" style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--ink-color)' }}>Rs. {dailyAllowance.toLocaleString('en-US')}<span style={{ color: 'var(--ink-muted)', fontWeight: 400, fontSize: '0.8rem' }}>/day</span></p>
               </div>
               <div style={{ textAlign: 'right' }}>
-                <span style={{ fontSize: '0.85rem', color: 'var(--ink-muted)' }}>Outflow</span>
-                <h3 className="num" style={{ fontSize: '1.25rem', fontWeight: 600 }}>Rs. {totalOut.toLocaleString('en-US')}</h3>
+                <p style={{ fontSize: '0.7rem', color: 'var(--ink-light)', marginBottom: '2px' }}>Days Left</p>
+                <p className="num" style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--ink-color)' }}>{daysRemaining} <span style={{ color: 'var(--ink-muted)', fontWeight: 400, fontSize: '0.8rem' }}>days</span></p>
               </div>
             </div>
-          </div>
-          
-          <div className="flex flex-col gap-2">
-            <div style={{
-              height: '8px',
-              width: '100%',
-              backgroundColor: 'rgba(128, 128, 128, 0.08)',
-              borderRadius: '9999px',
-              overflow: 'hidden',
-              display: 'flex',
-            }}>
-              <div style={{
-                height: '100%',
-                backgroundColor: 'var(--emerald-gains)',
-                width: `${(income + totalIn) > 0 ? Math.min(100, ((income + totalIn) / ((income + totalIn) + totalOut)) * 100) : 50}%`,
-                borderRadius: '9999px 0 0 9999px',
-              }} />
-              <div style={{
-                height: '100%',
-                backgroundColor: 'var(--coral-losses)',
-                width: `${totalOut > 0 ? Math.min(100, (totalOut / ((income + totalIn) + totalOut)) * 100) : 50}%`,
-                borderRadius: '0 9999px 9999px 0',
-              }} />
-            </div>
-            <div className="flex justify-between" style={{ fontSize: '0.78rem', color: 'var(--ink-light)' }}>
-              <span>{(income + totalIn) > 0 ? Math.round(((income + totalIn) / ((income + totalIn) + totalOut)) * 100) : 50}% In</span>
-              <span>{totalOut > 0 ? Math.round((totalOut / ((income + totalIn) + totalOut)) * 100) : 50}% Out</span>
-            </div>
+            {startingDisposablePool > 0 && (
+              <div style={{ width: '100%', height: '5px', borderRadius: '3px', background: 'var(--border-color)', overflow: 'hidden', marginTop: '0.75rem' }}>
+                <motion.div
+                  initial={{ width: 0 }}
+                  animate={{ width: `${Math.max(0, Math.min(100, (safeToSpend / startingDisposablePool) * 100))}%` }}
+                  transition={{ duration: 1, ease: [0.16, 1, 0.3, 1] }}
+                  style={{ height: '100%', borderRadius: '3px', background: spendColorStyle }}
+                />
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Savings Rate Card */}
-        <div className="card flex flex-col justify-between" style={{ minHeight: '220px' }}>
+        {/* Savings Rate */}
+        <div className="card flex flex-col justify-between" style={{ minHeight: '200px' }}>
           <div>
-            <div className="card-title">Savings Rate</div>
-            <div className="flex align-center gap-4">
-              <h2 className="num" style={{ fontSize: '3rem', fontWeight: 400, letterSpacing: '-0.04em', lineHeight: 1 }}>
+            <span className="card-title">Savings Rate</span>
+            <div style={{ display: 'flex', alignItems: 'flex-end', gap: '10px', marginBottom: '0.5rem' }}>
+              <h2 className="num" style={{ fontSize: 'clamp(2rem, 6vw, 3rem)', fontWeight: 700, letterSpacing: '-0.04em', lineHeight: 1, color: 'var(--ink-color)' }}>
                 {Math.round(savingsRate)}%
               </h2>
-              <span className="badge badge-gain" style={{ height: 'fit-content' }}>
-                {savingsRate >= 20 ? 'Optimal' : 'Healthy'}
+              <span className="badge badge-gain" style={{ marginBottom: '0.3rem' }}>
+                {savingsRate >= 20 ? 'Optimal' : savingsRate >= 10 ? 'Healthy' : 'Low'}
               </span>
             </div>
-            <p style={{ color: 'var(--ink-muted)', fontSize: '0.85rem', marginTop: 'var(--space-2)' }}>
-              You are retaining Rs. {Math.max(0, (income + totalIn - totalOut)).toLocaleString('en-US')} of your income this month.
+            <p style={{ fontSize: '0.8rem', color: 'var(--ink-muted)' }}>
+              Retaining <span className="num" style={{ fontWeight: 600, color: 'var(--ink-color)' }}>Rs. {Math.max(0, income + totalIn - totalOut).toLocaleString('en-US')}</span> this month.
             </p>
           </div>
-
-          <div style={{ width: '100%', position: 'relative', height: '10px', backgroundColor: 'rgba(128, 128, 128, 0.08)', borderRadius: '9999px', overflow: 'hidden' }}>
+          <div style={{ width: '100%', height: '5px', borderRadius: '3px', background: 'var(--border-color)', overflow: 'hidden', marginTop: '1rem' }}>
             <motion.div
               initial={{ width: 0 }}
               animate={{ width: `${Math.min(100, Math.max(0, savingsRate))}%` }}
               transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1] }}
-              style={{
-                height: '100%',
-                backgroundColor: 'var(--emerald-gains)',
-                borderRadius: '9999px',
-              }}
+              style={{ height: '100%', borderRadius: '3px', background: 'var(--emerald-gains)' }}
             />
           </div>
         </div>
       </div>
 
-      {/* Snapshot / Transactions list */}
+      {/* ══ Cash Flow ═══════════════════════════════════════════════════════ */}
       <div className="card">
-        <div className="flex justify-between align-center" style={{ marginBottom: 'var(--space-4)' }}>
-          <button 
-            className="btn btn-secondary log-transaction-btn" 
-            style={{ padding: '8px 16px', fontSize: '0.85rem' }} 
-            onClick={() => {
-              setDesc('');
-              setAmount('');
-              setType('expense');
-              setCategory('Rent & Housing');
-              setSearchQuery('');
-              setShowAddModal(true);
-            }}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+          <span className="card-title" style={{ margin: 0 }}>Monthly Cash Flow</span>
+          <span style={{ fontSize: '0.72rem', color: 'var(--ink-light)' }}>{currentCycleLabel}</span>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: '1rem', marginBottom: '1rem' }}>
+          <div>
+            <span style={{ fontSize: '0.8rem', color: 'var(--ink-muted)', display: 'block', marginBottom: '2px' }}>Total Inflow</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+              <ArrowUpRight size={16} style={{ color: 'var(--emerald-gains)' }} />
+              <span className="num text-gain" style={{ fontSize: '1.4rem', fontWeight: 700 }}>Rs. {(income + totalIn).toLocaleString('en-US')}</span>
+            </div>
+          </div>
+          <div style={{ textAlign: 'right' }}>
+            <span style={{ fontSize: '0.8rem', color: 'var(--ink-muted)', display: 'block', marginBottom: '2px' }}>Total Outflow</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', justifyContent: 'flex-end' }}>
+              <span className="num text-loss" style={{ fontSize: '1.4rem', fontWeight: 700 }}>Rs. {totalOut.toLocaleString('en-US')}</span>
+              <ArrowDownRight size={16} style={{ color: 'var(--coral-losses)' }} />
+            </div>
+          </div>
+        </div>
+        <div style={{ height: '6px', width: '100%', borderRadius: '3px', background: 'var(--border-color)', overflow: 'hidden', display: 'flex' }}>
+          <motion.div
+            initial={{ width: 0 }}
+            animate={{ width: `${(income + totalIn) > 0 ? Math.min(100, ((income + totalIn) / ((income + totalIn) + Math.max(1, totalOut))) * 100) : 50}%` }}
+            transition={{ duration: 1, ease: [0.16, 1, 0.3, 1] }}
+            style={{ height: '100%', background: 'var(--emerald-gains)' }}
+          />
+          <motion.div
+            initial={{ width: 0 }}
+            animate={{ width: `${totalOut > 0 ? Math.min(100, (totalOut / ((income + totalIn) + Math.max(1, totalOut))) * 100) : 50}%` }}
+            transition={{ duration: 1, ease: [0.16, 1, 0.3, 1], delay: 0.1 }}
+            style={{ height: '100%', background: 'var(--coral-losses)' }}
+          />
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '6px', fontSize: '0.72rem', color: 'var(--ink-light)' }}>
+          <span style={{ color: 'var(--emerald-gains)' }}>{(income + totalIn) > 0 ? Math.round(((income + totalIn) / ((income + totalIn) + Math.max(1, totalOut))) * 100) : 50}% In</span>
+          <span style={{ color: 'var(--coral-losses)' }}>{totalOut > 0 ? Math.round((totalOut / ((income + totalIn) + Math.max(1, totalOut))) * 100) : 50}% Out</span>
+        </div>
+      </div>
+
+      {/* ══ Recent Transactions ══════════════════════════════════════════════ */}
+      <div className="card">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+          <span className="card-title" style={{ margin: 0 }}>Recent Activity</span>
+          <button
+            type="button"
+            onClick={() => { setDesc(''); setAmount(''); setType('expense'); setCategory('Rent & Housing'); setSearchQuery(''); setShowAddModal(true); }}
+            className="btn btn-secondary"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '6px 14px', fontSize: '0.8rem' }}
           >
-            <Plus size={14} /> Log Transaction
+            <Plus size={13} /> Log Transaction
           </button>
         </div>
 
         {transactions.length === 0 ? (
-          <div className="flex flex-col align-center justify-center" style={{ padding: 'var(--space-8) 0', color: 'var(--ink-light)', gap: 'var(--space-2)' }}>
-            <Calendar size={24} style={{ opacity: 0.5 }} />
-            <p style={{ fontSize: '0.9rem' }}>No logged entries for this month yet.</p>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2.5rem 0', gap: '8px', color: 'var(--ink-light)' }}>
+            <Calendar size={20} />
+            <p style={{ fontSize: '0.875rem' }}>No entries yet. Log your first transaction.</p>
           </div>
         ) : (
-          <div className="flex flex-col" style={{ borderTop: '1px solid var(--border-color)' }}>
-            {transactions.slice(0, 5).map((tx) => (
-              <div key={tx.id} className="flex justify-between align-center" style={{
-                padding: 'var(--space-4) 0',
-                borderBottom: '1px solid var(--border-color)',
-              }}>
-                <div className="flex flex-col">
-                  <span style={{ fontWeight: 550, fontSize: '0.95rem' }}>{tx.description}</span>
-                  <span style={{ fontSize: '0.78rem', color: 'var(--ink-muted)' }}>
-                    {tx.category} • {new Date(tx.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                  </span>
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            {transactions.slice(0, 5).map((tx, idx) => (
+              <motion.div
+                key={tx.id}
+                initial={{ opacity: 0, x: -8 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: idx * 0.05, duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+                style={{
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                  padding: '0.75rem 0', borderBottom: '1px solid var(--border-color)',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
+                  <div style={{
+                    width: '34px', height: '34px', borderRadius: '50%', flexShrink: 0,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    background: tx.type === 'income' ? 'var(--emerald-gains-bg)' : 'var(--coral-losses-bg)',
+                  }}>
+                    {tx.type === 'income'
+                      ? <ArrowUpRight size={14} style={{ color: 'var(--emerald-gains)' }} />
+                      : <ArrowDownRight size={14} style={{ color: 'var(--coral-losses)' }} />}
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                    <span style={{ fontWeight: 550, fontSize: '0.875rem', color: 'var(--ink-color)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{tx.description}</span>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--ink-light)', marginTop: '1px' }}>
+                      {tx.category} · {new Date(tx.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    </span>
+                  </div>
                 </div>
-                <div className="flex align-center gap-2">
-                  <span className={`num ${tx.type === 'income' ? 'text-gain' : 'text-loss'}`} style={{ fontWeight: 600 }}>
-                    {tx.type === 'income' ? '+' : '-'} Rs. {tx.amount.toLocaleString('en-US')}
-                  </span>
-                  {tx.type === 'income' ? (
-                    <ArrowUpRight size={14} className="text-gain" />
-                  ) : (
-                    <ArrowDownRight size={14} className="text-loss" />
-                  )}
-                </div>
-              </div>
+                <span className="num" style={{ fontWeight: 650, fontSize: '0.875rem', flexShrink: 0, marginLeft: '12px', color: tx.type === 'income' ? 'var(--emerald-gains)' : 'var(--coral-losses)' }}>
+                  {tx.type === 'income' ? '+' : '−'} Rs. {tx.amount.toLocaleString('en-US')}
+                </span>
+              </motion.div>
             ))}
             {transactions.length > 5 && (
-              <div className="flex justify-center" style={{ paddingTop: 'var(--space-4)' }}>
-                <button
-                  type="button"
-                  onClick={() => onNavigate && onNavigate('reports')}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    color: 'var(--emerald-gains)',
-                    fontSize: '0.85rem',
-                    fontWeight: 650,
-                    cursor: 'pointer',
-                    textDecoration: 'underline',
-                    padding: '4px 0',
-                  }}
-                >
-                  View Full Ledger ({transactions.length} entries)
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={() => onNavigate?.('reports')}
+                style={{ marginTop: '1rem', width: '100%', padding: '0.5rem', fontSize: '0.8rem', fontWeight: 600, color: 'var(--emerald-gains)', background: 'none', border: 'none', cursor: 'pointer' }}
+              >
+                View all {transactions.length} entries →
+              </button>
             )}
           </div>
         )}
       </div>
 
-      {/* Add Transaction Modal */}
+      {/* ══ Modal — Log Transaction ══════════════════════════════════════════ */}
       {showAddModal && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(10, 10, 10, 0.4)',
-          backdropFilter: 'blur(4px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 1000,
-          padding: 'var(--space-4)',
-        }}>
+        <div style={MODAL_STYLE}>
           <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-            className="card"
-            style={{
-              width: '100%',
-              maxWidth: '400px',
-              padding: 'var(--space-6)',
-              backgroundColor: 'var(--card-bg)',
-              boxShadow: '0 20px 40px rgba(0,0,0,0.06)',
-              overflow: 'visible',
-            }}
+            initial={{ opacity: 0, scale: 0.95, y: 8 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 8 }}
+            transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+            style={{ ...MODAL_CARD, maxWidth: '400px', overflowY: 'auto', maxHeight: '90vh' }}
           >
-            <h3 className="serif-title" style={{ fontSize: '1.6rem', marginBottom: 'var(--space-4)' }}>Log Entry</h3>
-            
-            {/* Scan Receipt Upload Zone */}
-            <div style={{ marginBottom: 'var(--space-4)' }}>
-              <label 
-                htmlFor="receipt-upload" 
-                style={{ 
-                  display: 'flex', 
-                  flexDirection: 'column',
-                  alignItems: 'center', 
-                  justifyContent: 'center',
-                  gap: 'var(--space-2)',
-                  padding: 'var(--space-4)',
-                  borderRadius: 'var(--radius-md)',
-                  border: '1px dashed var(--border-color)',
-                  backgroundColor: 'var(--bg-color)',
-                  cursor: 'pointer',
-                  transition: 'all var(--transition-fast)',
-                }}
+            <h3 style={{ fontSize: '1.5rem', fontWeight: 400, fontStyle: 'italic', fontFamily: 'var(--font-serif)', color: 'var(--ink-color)', marginBottom: '1rem' }}>Log Entry</h3>
+
+            {/* Receipt scan zone */}
+            <div style={{ marginBottom: '1rem' }}>
+              <label
+                htmlFor="receipt-upload"
+                style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '1rem', borderRadius: '0.75rem', border: '1.5px dashed var(--border-color)', background: 'var(--nav-pill-bg)', cursor: 'pointer' }}
               >
                 <input
-                  type="file"
-                  id="receipt-upload"
-                  accept="image/*"
-                  onChange={handleReceiptScan}
-                  style={{ display: 'none' }}
-                  disabled={isScanning}
+                  type="file" id="receipt-upload" accept="image/*"
+                  onChange={handleReceiptScan} style={{ display: 'none' }} disabled={isScanning}
                 />
-                
                 {isScanning ? (
-                  <div className="flex flex-col align-center gap-2 text-center" style={{ width: '100%' }}>
-                    <Loader2 className="animate-spin text-gain" size={20} style={{ color: 'var(--emerald-gains)' }} />
-                    <span style={{ fontSize: '0.8rem', fontWeight: 550 }}>Analyzing receipt ({scanProgress}%)</span>
-                    <div style={{ 
-                      width: '100%', 
-                      height: '4px', 
-                      backgroundColor: 'var(--border-color)', 
-                      borderRadius: '2px',
-                      overflow: 'hidden',
-                      marginTop: '4px'
-                    }}>
-                      <motion.div 
-                        style={{ height: '100%', backgroundColor: 'var(--emerald-gains)', width: `${scanProgress}%` }} 
-                        layout
-                      />
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', width: '100%', textAlign: 'center' }}>
+                    <Loader2 size={20} style={{ color: 'var(--emerald-gains)', animation: 'spin 1s linear infinite' }} />
+                    <span style={{ fontSize: '0.75rem', fontWeight: 500, color: 'var(--ink-muted)' }}>Analyzing receipt ({scanProgress}%)</span>
+                    <div style={{ width: '100%', height: '4px', borderRadius: '2px', background: 'var(--border-color)', overflow: 'hidden', marginTop: '4px' }}>
+                      <motion.div style={{ height: '100%', background: 'var(--emerald-gains)', borderRadius: '2px', width: `${scanProgress}%` }} layout />
                     </div>
                   </div>
                 ) : (
-                  <div className="flex align-center gap-2" style={{ color: 'var(--ink-muted)', fontSize: '0.8rem', fontWeight: 550 }}>
-                    <Camera size={14} />
-                    <span>Scan Receipt (AI Auto-Fill)</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', fontWeight: 500, color: 'var(--ink-muted)' }}>
+                    <Camera size={14} /><span>Scan Receipt (AI Auto-Fill)</span>
                   </div>
                 )}
               </label>
-              
               {scanError && (
-                <div style={{ 
-                  fontSize: '0.75rem', 
-                  color: 'var(--coral-losses)', 
-                  marginTop: 'var(--space-2)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px'
-                }}>
-                  <AlertCircle size={12} />
-                  <span>{scanError}</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '5px', color: 'var(--coral-losses)', fontSize: '0.75rem', marginTop: '6px' }}>
+                  <AlertCircle size={12} /><span>{scanError}</span>
                 </div>
               )}
             </div>
 
-            <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+            <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              {/* Type toggle */}
               <div className="input-group">
                 <label className="input-label">Type</label>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    className="btn"
-                    style={{
-                      flex: 1,
-                      backgroundColor: type === 'expense' ? 'var(--ink-color)' : 'var(--bg-color)',
-                      color: type === 'expense' ? 'var(--bg-color)' : 'var(--ink-color)',
-                      border: '1px solid var(--border-color)',
-                      fontSize: '0.85rem',
-                      padding: '8px 0',
-                    }}
-                    onClick={() => handleTypeChange('expense')}
-                  >
-                    Expense
-                  </button>
-                  <button
-                    type="button"
-                    className="btn"
-                    style={{
-                      flex: 1,
-                      backgroundColor: type === 'income' ? 'var(--ink-color)' : 'var(--bg-color)',
-                      color: type === 'income' ? 'var(--bg-color)' : 'var(--ink-color)',
-                      border: '1px solid var(--border-color)',
-                      fontSize: '0.85rem',
-                      padding: '8px 0',
-                    }}
-                    onClick={() => handleTypeChange('income')}
-                  >
-                    Income
-                  </button>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  {(['expense', 'income'] as const).map((t) => (
+                    <button
+                      key={t} type="button" onClick={() => handleTypeChange(t)}
+                      style={{
+                        flex: 1, padding: '8px', borderRadius: '10px', fontSize: '0.875rem', fontWeight: 500,
+                        border: '1px solid', cursor: 'pointer', transition: 'all 0.2s',
+                        background: type === t ? 'var(--ink-color)' : 'var(--nav-pill-bg)',
+                        color: type === t ? 'var(--bg-color)' : 'var(--ink-muted)',
+                        borderColor: type === t ? 'var(--ink-color)' : 'var(--border-color)',
+                      }}
+                    >
+                      {t.charAt(0).toUpperCase() + t.slice(1)}
+                    </button>
+                  ))}
                 </div>
               </div>
 
+              {/* Description */}
               <div className="input-group">
                 <label className="input-label">Description</label>
                 <input
-                  type="text"
-                  placeholder="e.g. Weekly Groceries"
-                  value={desc}
-                  onChange={(e) => setDesc(e.target.value)}
+                  type="text" placeholder="e.g. Weekly Groceries" value={desc}
+                  onChange={(e) => setDesc(e.target.value)} required
                   className="input-field"
-                  required
                 />
               </div>
 
+              {/* Amount */}
               <div className="input-group">
                 <label className="input-label">Amount (MUR)</label>
                 <input
-                  type="text"
-                  placeholder="2,500"
-                  value={amount}
-                  onChange={(e) => handleCurrencyChange(e.target.value, setAmount)}
+                  type="text" placeholder="2,500" value={amount}
+                  onChange={(e) => handleCurrencyChange(e.target.value, setAmount)} required
                   className="input-field num-input"
-                  required
                 />
               </div>
 
+              {/* Category dropdown */}
               <div className="input-group" style={{ position: 'relative' }}>
                 <label className="input-label">Category</label>
                 <button
                   type="button"
-                  className="input-field flex justify-between align-center"
-                  style={{
-                    background: 'var(--bg-color)',
-                    textAlign: 'left',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    padding: 'var(--space-3) var(--space-4)',
-                    border: '1px solid var(--border-color)',
-                    borderRadius: 'var(--radius-md)',
-                    width: '100%',
-                  }}
-                  onClick={() => {
-                    setDropdownOpen(!dropdownOpen);
-                    setSearchQuery('');
-                  }}
+                  onClick={() => { setDropdownOpen(!dropdownOpen); setSearchQuery(''); }}
+                  className="input-field"
+                  style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}
                 >
-                  <span style={{ fontWeight: 550 }}>{category || 'Select category'}</span>
-                  <ChevronDown size={16} style={{ color: 'var(--ink-muted)', transform: dropdownOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+                  <span style={{ fontWeight: 500 }}>{category || 'Select category'}</span>
+                  <ChevronDown size={14} style={{ color: 'var(--ink-muted)', transform: dropdownOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
                 </button>
-
                 {dropdownOpen && (
                   <>
-                    <div
-                      style={{
-                        position: 'fixed',
-                        top: 0,
-                        left: 0,
-                        right: 0,
-                        bottom: 0,
-                        zIndex: 99,
-                      }}
-                      onClick={() => setDropdownOpen(false)}
-                    />
+                    <div style={{ position: 'fixed', inset: 0, zIndex: 99 }} onClick={() => setDropdownOpen(false)} />
                     <motion.div
                       initial={{ opacity: 0, y: 4, scale: 0.98 }}
                       animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, y: 4, scale: 0.98 }}
-                      transition={{ duration: 0.15, ease: 'easeOut' }}
-                      style={{
-                        position: 'absolute',
-                        top: '100%',
-                        left: 0,
-                        right: 0,
-                        marginTop: '4px',
-                        backgroundColor: 'var(--card-bg)',
-                        border: '1px solid var(--border-color)',
-                        borderRadius: 'var(--radius-md)',
-                        boxShadow: '0 8px 24px rgba(0, 0, 0, 0.12)',
-                        zIndex: 100,
-                        padding: '12px',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '8px',
-                      }}
+                      transition={{ duration: 0.15 }}
+                      style={{ position: 'absolute', top: '100%', left: 0, right: 0, marginTop: '4px', background: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '12px', boxShadow: '0 8px 32px rgba(0,0,0,0.12)', zIndex: 100, padding: '10px', display: 'flex', flexDirection: 'column', gap: '6px' }}
                     >
-                      {/* Search Input */}
-                      <div className="flex align-center gap-2" style={{
-                        border: '1px solid var(--border-color)',
-                        borderRadius: '4px',
-                        padding: '4px 8px',
-                        backgroundColor: 'var(--bg-color)',
-                      }}>
-                        <Search size={14} style={{ color: 'var(--ink-muted)' }} />
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '6px 10px', background: 'var(--nav-pill-bg)' }}>
+                        <Search size={13} style={{ color: 'var(--ink-light)', flexShrink: 0 }} />
                         <input
-                          type="text"
-                          placeholder="Search or type custom..."
-                          value={searchQuery}
-                          onChange={(e) => setSearchQuery(e.target.value)}
-                          style={{
-                            border: 'none',
-                            outline: 'none',
-                            background: 'transparent',
-                            fontSize: '0.85rem',
-                            width: '100%',
-                            color: 'var(--ink-color)',
-                          }}
+                          type="text" placeholder="Search or type custom..."
+                          value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
                           onClick={(e) => e.stopPropagation()}
+                          style={{ background: 'transparent', border: 'none', outline: 'none', color: 'var(--ink-color)', fontSize: '0.78rem', width: '100%' }}
                         />
                       </div>
-
-                      {/* Suggestions list */}
-                      <div style={{ maxHeight: '150px', overflowY: 'auto' }} className="flex flex-col gap-1">
-                        {/* Custom option if query doesn't match */}
+                      <div style={{ maxHeight: '9rem', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '2px' }}>
                         {searchQuery.trim() !== '' && !categories.some(c => c.toLowerCase() === searchQuery.trim().toLowerCase()) && (
                           <button
                             type="button"
-                            style={{
-                              width: '100%',
-                              textAlign: 'left',
-                              padding: '8px 10px',
-                              border: 'none',
-                              background: 'rgba(15, 122, 92, 0.05)',
-                              color: 'var(--emerald-gains)',
-                              fontSize: '0.82rem',
-                              borderRadius: '4px',
-                              cursor: 'pointer',
-                              fontWeight: 600,
-                            }}
-                            onClick={() => {
-                              setCategory(searchQuery.trim());
-                              setDropdownOpen(false);
-                            }}
+                            onClick={() => { setCategory(searchQuery.trim()); setDropdownOpen(false); }}
+                            style={{ width: '100%', textAlign: 'left', padding: '7px 10px', borderRadius: '8px', background: 'var(--emerald-gains-bg)', color: 'var(--emerald-gains)', fontSize: '0.78rem', fontWeight: 600, border: 'none', cursor: 'pointer' }}
                           >
                             + Create "{searchQuery.trim()}"
                           </button>
                         )}
-
-                        {categories
-                          .filter(c => c.toLowerCase().includes(searchQuery.toLowerCase()))
-                          .map((c) => {
-                            const isSelected = category === c;
-                            return (
-                              <button
-                                key={c}
-                                type="button"
-                                style={{
-                                  width: '100%',
-                                  textAlign: 'left',
-                                  padding: '8px 10px',
-                                  border: 'none',
-                                  background: isSelected ? 'rgba(10, 10, 10, 0.04)' : 'none',
-                                  color: 'var(--ink-color)',
-                                  fontSize: '0.82rem',
-                                  borderRadius: '4px',
-                                  cursor: 'pointer',
-                                  display: 'flex',
-                                  justifyContent: 'space-between',
-                                  alignItems: 'center',
-                                  transition: 'background 0.2s',
-                                }}
-                                onMouseEnter={(e) => {
-                                  if (!isSelected) e.currentTarget.style.backgroundColor = 'rgba(10, 10, 10, 0.02)';
-                                }}
-                                onMouseLeave={(e) => {
-                                  if (!isSelected) e.currentTarget.style.backgroundColor = 'transparent';
-                                }}
-                                onClick={() => {
-                                  setCategory(c);
-                                  setDropdownOpen(false);
-                                }}
-                              >
-                                <span style={{ fontWeight: isSelected ? 600 : 400 }}>{c}</span>
-                              </button>
-                            );
-                          })}
+                        {categories.filter(c => c.toLowerCase().includes(searchQuery.toLowerCase())).map((c) => (
+                          <button
+                            key={c} type="button"
+                            onClick={() => { setCategory(c); setDropdownOpen(false); }}
+                            style={{ width: '100%', textAlign: 'left', padding: '7px 10px', borderRadius: '8px', fontSize: '0.82rem', border: 'none', cursor: 'pointer', fontWeight: category === c ? 600 : 400, background: category === c ? 'var(--border-color)' : 'transparent', color: category === c ? 'var(--ink-color)' : 'var(--ink-muted)' }}
+                          >
+                            {c}
+                          </button>
+                        ))}
                       </div>
                     </motion.div>
                   </>
                 )}
               </div>
 
+              {/* Split toggle */}
               {partnerProfile && type === 'expense' && (
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: 'var(--space-3) var(--space-4)',
-                  borderRadius: 'var(--radius-md)',
-                  backgroundColor: 'var(--bg-color)',
-                  border: '1px solid var(--border-color)',
-                  marginTop: 'var(--space-2)'
-                }}>
-                  <div style={{ display: 'flex', flexDirection: 'column' }}>
-                    <span style={{ fontSize: '0.85rem', fontWeight: 550, color: 'var(--ink-color)' }}>Split 50/50</span>
-                    <span style={{ fontSize: '0.72rem', color: 'var(--ink-muted)' }}>Split this transaction with {partnerProfile.name}</span>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', borderRadius: '10px', background: 'var(--nav-pill-bg)', border: '1px solid var(--border-color)' }}>
+                  <div>
+                    <p style={{ fontSize: '0.875rem', fontWeight: 550, color: 'var(--ink-color)' }}>Split 50/50</p>
+                    <p style={{ fontSize: '0.75rem', color: 'var(--ink-muted)' }}>Split with {partnerProfile.name}</p>
                   </div>
-                  <label className="switch" style={{
-                    position: 'relative',
-                    display: 'inline-block',
-                    width: '40px',
-                    height: '22px'
-                  }}>
+                  <label className="relative inline-block w-10 h-[22px] cursor-pointer shrink-0">
                     <input
-                      type="checkbox"
-                      id="splitWithPartner"
-                      checked={splitWithPartner}
-                      onChange={(e) => setSplitWithPartner(e.target.checked)}
-                      style={{ opacity: 0, width: 0, height: 0 }}
+                      type="checkbox" id="splitWithPartner"
+                      checked={splitWithPartner} onChange={(e) => setSplitWithPartner(e.target.checked)}
+                      className="sr-only"
                     />
-                    <span style={{
-                      position: 'absolute',
-                      cursor: 'pointer',
-                      top: 0, left: 0, right: 0, bottom: 0,
-                      backgroundColor: splitWithPartner ? 'var(--emerald-gains)' : 'var(--border-color)',
-                      transition: '.3s',
-                      borderRadius: '22px'
-                    }}>
-                      <span style={{
-                        position: 'absolute',
-                        content: '""',
-                        height: '16px',
-                        width: '16px',
-                        left: '3px',
-                        bottom: '3px',
-                        backgroundColor: '#ffffff',
-                        transition: '.3s',
-                        borderRadius: '50%',
-                        transform: splitWithPartner ? 'translateX(18px)' : 'translateX(0)',
-                        boxShadow: '0 1px 3px rgba(0,0,0,0.15)'
-                      }} />
+                    <span style={{ position: 'absolute', inset: 0, borderRadius: '9999px', background: splitWithPartner ? 'var(--emerald-gains)' : 'var(--border-color)', transition: 'background 0.3s' }}>
+                      <span
+                        className="absolute bottom-[3px] left-[3px] w-4 h-4 rounded-full bg-white shadow transition-transform duration-300"
+                        style={{ transform: splitWithPartner ? 'translateX(18px)' : 'translateX(0)' }}
+                      />
                     </span>
                   </label>
                 </div>
               )}
 
-              <div className="flex justify-between" style={{ marginTop: 'var(--space-4)' }}>
-                <button type="button" className="btn btn-secondary" onClick={() => setShowAddModal(false)}>
-                  Cancel
-                </button>
-                <button type="submit" className="btn btn-primary">
-                  Log Entry
-                </button>
+              <div style={{ display: 'flex', gap: '10px', marginTop: '4px' }}>
+                <button type="button" onClick={() => setShowAddModal(false)} className="btn btn-secondary" style={{ flex: 1 }}>Cancel</button>
+                <button type="submit" className="btn btn-primary" style={{ flex: 1 }}>Log Entry</button>
               </div>
             </form>
           </motion.div>
         </div>
       )}
-      {/* Adjust Cash Modal */}
+
+      {/* ══ Modal — Adjust Available Cash ═══════════════════════════════════ */}
       {showAdjustModal && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(10, 10, 10, 0.4)',
-          backdropFilter: 'blur(4px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 1000,
-          padding: 'var(--space-4)',
-        }}>
+        <div style={MODAL_STYLE}>
           <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-            className="card"
-            style={{
-              width: '100%',
-              maxWidth: '400px',
-              padding: 'var(--space-6)',
-              backgroundColor: 'var(--card-bg)',
-              boxShadow: '0 20px 40px rgba(0,0,0,0.06)',
-            }}
+            initial={{ opacity: 0, scale: 0.95, y: 8 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 8 }}
+            transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+            style={{ ...MODAL_CARD, maxWidth: '400px' }}
           >
-            <h3 className="serif-title" style={{ fontSize: '1.6rem', marginBottom: 'var(--space-2)' }}>Adjust Available Cash</h3>
-            <p style={{ fontSize: '0.82rem', color: 'var(--ink-muted)', marginBottom: 'var(--space-4)', lineHeight: 1.4 }}>
+            <h3 style={{ fontSize: '1.5rem', fontWeight: 400, fontStyle: 'italic', fontFamily: 'var(--font-serif)', color: 'var(--ink-color)', marginBottom: '4px' }}>Adjust Available Cash</h3>
+            <p style={{ fontSize: '0.8rem', color: 'var(--ink-muted)', marginBottom: '1.25rem', lineHeight: 1.5 }}>
               Manually adjust the cash held in your bank account. Your total Net Worth will be updated dynamically below.
             </p>
-
-            <form onSubmit={handleSaveBalanceAdjust} className="flex flex-col gap-4">
+            <form onSubmit={handleSaveBalanceAdjust} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <div className="input-group">
                 <label className="input-label">Available Bank Cash (MUR)</label>
                 <input
-                  type="text"
-                  placeholder="e.g. 50,000"
-                  value={newBalanceInput}
+                  type="text" placeholder="e.g. 50,000" value={newBalanceInput}
                   onChange={(e) => handleCurrencyChange(e.target.value, setNewBalanceInput)}
+                  required autoFocus
                   className="input-field num-input"
-                  required
-                  autoFocus
                 />
               </div>
-
-              <div style={{
-                backgroundColor: 'var(--bg-color)',
-                padding: 'var(--space-4)',
-                borderRadius: 'var(--radius-md)',
-                border: '1px solid var(--border-color)',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '8px'
-              }}>
-                <div className="flex justify-between" style={{ fontSize: '0.85rem' }}>
+              <div style={{ background: 'var(--nav-pill-bg)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.875rem' }}>
                   <span style={{ color: 'var(--ink-muted)' }}>Other Assets:</span>
-                  <span className="num" style={{ fontWeight: 550 }}>
-                    Rs. {Math.max(0, balance - generalBalance).toLocaleString('en-US')}
-                  </span>
+                  <span className="num" style={{ fontWeight: 500, color: 'var(--ink-color)' }}>Rs. {Math.max(0, balance - generalBalance).toLocaleString('en-US')}</span>
                 </div>
-                <div className="flex justify-between" style={{ fontSize: '0.85rem', paddingTop: '4px', borderTop: '1px solid var(--border-color)' }}>
-                  <span style={{ fontWeight: 600 }}>Forecasted Net Worth:</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.875rem', paddingTop: '10px', borderTop: '1px solid var(--border-color)' }}>
+                  <span style={{ fontWeight: 600, color: 'var(--ink-color)' }}>Forecasted Net Worth:</span>
                   <span className="num" style={{ fontWeight: 700, color: 'var(--emerald-gains)' }}>
                     Rs. {((parseFloat(newBalanceInput.replace(/,/g, '')) || 0) + Math.max(0, balance - generalBalance)).toLocaleString('en-US')}
                   </span>
                 </div>
               </div>
-
-              <div className="flex justify-between" style={{ marginTop: 'var(--space-4)' }}>
-                <button type="button" className="btn btn-secondary" onClick={() => setShowAdjustModal(false)}>
-                  Cancel
-                </button>
-                <button type="submit" className="btn btn-primary">
-                  Save Balance
-                </button>
+              <div style={{ display: 'flex', gap: '10px', marginTop: '4px' }}>
+                <button type="button" onClick={() => setShowAdjustModal(false)} className="btn btn-secondary" style={{ flex: 1 }}>Cancel</button>
+                <button type="submit" className="btn btn-primary" style={{ flex: 1 }}>Save Balance</button>
               </div>
             </form>
           </motion.div>
         </div>
       )}
 
-      {/* Safe to Spend Info Modal */}
+      {/* ══ Modal — Safe to Spend Breakdown ══════════════════════════════════ */}
       {showSafeToSpendModal && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(10, 10, 10, 0.4)',
-          backdropFilter: 'blur(4px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 1000,
-          padding: 'var(--space-4)',
-        }}>
+        <div style={MODAL_STYLE}>
           <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-            className="card"
-            style={{
-              width: '100%',
-              maxWidth: '480px',
-              padding: 'var(--space-6)',
-              backgroundColor: 'var(--card-bg)',
-              boxShadow: '0 20px 40px rgba(0,0,0,0.06)',
-            }}
+            initial={{ opacity: 0, scale: 0.95, y: 8 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 8 }}
+            transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+            style={{ ...MODAL_CARD, maxWidth: '480px' }}
           >
-            <h3 className="serif-title" style={{ fontSize: '1.6rem', marginBottom: 'var(--space-2)' }}>Safe to Spend Breakdown</h3>
-            <p style={{ fontSize: '0.82rem', color: 'var(--ink-muted)', marginBottom: 'var(--space-4)', lineHeight: 1.4 }}>
-              This displays how much cash you can safely spend on variable daily expenses (discretionary items, dining, shopping, etc.) during your current salary cycle (<strong>{currentCycleLabel}</strong>) without affecting your bills or savings target commitments.
+            <h3 style={{ fontSize: '1.5rem', fontWeight: 400, fontStyle: 'italic', fontFamily: 'var(--font-serif)', color: 'var(--ink-color)', marginBottom: '4px' }}>Safe to Spend Breakdown</h3>
+            <p style={{ fontSize: '0.8rem', color: 'var(--ink-muted)', marginBottom: '1.25rem', lineHeight: 1.5 }}>
+              How much you can safely spend on daily variable expenses during{' '}
+              <strong style={{ color: 'var(--ink-color)' }}>{currentCycleLabel}</strong> without affecting bills or savings commitments.
             </p>
-
-            <div style={{
-              backgroundColor: 'var(--bg-color)',
-              padding: 'var(--space-4)',
-              borderRadius: 'var(--radius-md)',
-              border: '1px solid var(--border-color)',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '12px'
-            }}>
-              <div className="flex justify-between" style={{ fontSize: '0.85rem' }}>
-                <span style={{ color: 'var(--ink-muted)' }}>1. Expected Regular Inflow:</span>
-                <span className="num text-gain" style={{ fontWeight: 550 }}>
-                  + Rs. {income.toLocaleString('en-US')}
-                </span>
-              </div>
-              <div className="flex justify-between" style={{ fontSize: '0.85rem' }}>
-                <span style={{ color: 'var(--ink-muted)' }}>2. Extra Inflows Logged:</span>
-                <span className="num text-gain" style={{ fontWeight: 550 }}>
-                  + Rs. {extraInflowsThisCycle.toLocaleString('en-US')}
-                </span>
-              </div>
-              <div className="flex justify-between" style={{ fontSize: '0.85rem' }}>
-                <span style={{ color: 'var(--ink-muted)' }}>3. Committed Recurring Bills:</span>
-                <span className="num text-loss" style={{ fontWeight: 550 }}>
-                  - Rs. {recurringExpenses.toLocaleString('en-US')}
-                </span>
-              </div>
-              <div className="flex justify-between" style={{ fontSize: '0.85rem' }}>
-                <span style={{ color: 'var(--ink-muted)' }}>4. Active Savings Goals:</span>
-                <span className="num text-loss" style={{ fontWeight: 550 }}>
-                  - Rs. {savingsTargetsSum.toLocaleString('en-US')}
-                </span>
-              </div>
-              
-              <div style={{ borderTop: '1px dashed var(--border-color)', margin: '4px 0' }} />
-              
-              <div className="flex justify-between" style={{ fontSize: '0.85rem' }}>
+            <div style={{ background: 'var(--nav-pill-bg)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {[
+                { label: '1. Expected Regular Inflow:',   val: income,               sign: '+', gain: true },
+                { label: '2. Extra Inflows Logged:',      val: extraInflowsThisCycle, sign: '+', gain: true },
+                { label: '3. Committed Recurring Bills:', val: recurringExpenses,     sign: '−', gain: false },
+                { label: '4. Active Savings Goals:',      val: savingsTargetsSum,     sign: '−', gain: false },
+              ].map((row, i) => (
+                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.875rem' }}>
+                  <span style={{ color: 'var(--ink-muted)' }}>{row.label}</span>
+                  <span className="num" style={{ fontWeight: 500, color: row.gain ? 'var(--emerald-gains)' : 'var(--coral-losses)' }}>{row.sign} Rs. {row.val.toLocaleString('en-US')}</span>
+                </div>
+              ))}
+              <div style={{ borderTop: '1px dashed var(--border-color)', margin: '2px 0' }} />
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.875rem' }}>
                 <span style={{ fontWeight: 600, color: 'var(--ink-color)' }}>Starting Disposable Pool:</span>
-                <span className="num" style={{ fontWeight: 700, color: 'var(--ink-color)' }}>
-                  Rs. {startingDisposablePool.toLocaleString('en-US')}
-                </span>
+                <span className="num" style={{ fontWeight: 700, color: 'var(--ink-color)' }}>Rs. {startingDisposablePool.toLocaleString('en-US')}</span>
               </div>
-              
-              <div className="flex justify-between" style={{ fontSize: '0.85rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.875rem' }}>
                 <span style={{ color: 'var(--ink-muted)' }}>5. Daily Expenses Logged:</span>
-                <span className="num text-loss" style={{ fontWeight: 550 }}>
-                  - Rs. {loggedExpensesThisCycle.toLocaleString('en-US')}
-                </span>
+                <span className="num" style={{ fontWeight: 500, color: 'var(--coral-losses)' }}>− Rs. {loggedExpensesThisCycle.toLocaleString('en-US')}</span>
               </div>
-              
-              <div style={{ borderTop: '1px solid var(--border-color)', margin: '4px 0' }} />
-              
-              <div className="flex justify-between" style={{ fontSize: '0.9rem', paddingTop: '4px' }}>
-                <span style={{ fontWeight: 650 }}>Safe to Spend Remaining:</span>
-                <span className="num" style={{ 
-                  fontWeight: 750, 
-                  color: safeToSpend > 5000 ? 'var(--emerald-gains)' : safeToSpend > 0 ? '#EAB308' : 'var(--coral-losses)' 
-                }}>
-                  Rs. {safeToSpend.toLocaleString('en-US')}
-                </span>
+              <div style={{ borderTop: '1px solid var(--border-color)', margin: '2px 0' }} />
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.875rem' }}>
+                <span style={{ fontWeight: 600, color: 'var(--ink-color)' }}>Safe to Spend Remaining:</span>
+                <span className="num" style={{ fontWeight: 700, color: spendColorStyle }}>Rs. {safeToSpend.toLocaleString('en-US')}</span>
               </div>
             </div>
-
-            <div className="flex justify-center" style={{ marginTop: 'var(--space-6)' }}>
-              <button type="button" className="btn btn-primary" style={{ width: '100%' }} onClick={() => setShowSafeToSpendModal(false)}>
-                Got it
-              </button>
-            </div>
+            <button
+              type="button" onClick={() => setShowSafeToSpendModal(false)}
+              className="btn btn-primary"
+              style={{ width: '100%', marginTop: '1rem' }}
+            >
+              Got it
+            </button>
           </motion.div>
         </div>
       )}

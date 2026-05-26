@@ -33,6 +33,19 @@ const parseCategory = (cat: string) => {
   return { classification: cat, name: cat.charAt(0).toUpperCase() + cat.slice(1) };
 };
 
+const SLIDER_COLORS = {
+  needs:   'var(--coral-losses)',
+  wants:   '#E2A83B',
+  savings: 'var(--emerald-gains)',
+};
+
+const getCategoryStyle = (classification: string): { color: string; bg: string } => {
+  if (classification === 'needs')   return { color: 'var(--coral-losses)',  bg: 'var(--coral-losses-bg)' };
+  if (classification === 'wants')   return { color: '#B45309',             bg: 'rgba(228,168,59,0.1)' };
+  if (classification === 'savings') return { color: 'var(--emerald-gains)', bg: 'var(--emerald-gains-bg)' };
+  return { color: 'var(--ink-muted)', bg: 'var(--border-color)' };
+};
+
 const renderCategoryDisplay = (catString: string) => {
   const { classification, name } = parseCategory(catString);
   if (catString === 'income') return 'Income';
@@ -249,45 +262,57 @@ export const CashFlow: React.FC<CashFlowProps> = ({
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -15 }}
       transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-      className="flex flex-col gap-8"
+      className="flex flex-col gap-6"
     >
       <div className="flex flex-col gap-1">
-        <h1 style={{ fontFamily: 'var(--font-sans)', fontSize: '2.25rem', fontWeight: 700, letterSpacing: '-0.03em', color: 'var(--ink-color)', margin: 0 }}>Cash Flow Planner</h1>
-        <p style={{ color: 'var(--ink-light)', fontSize: '0.9rem', lineHeight: '1.5', margin: 0 }}>
-          Review your recurring allocations, adjust your budget boundaries, and unlock disposable cash.
+        <h1 style={{ fontFamily: 'var(--font-sans)', fontSize: '1.75rem', fontWeight: 700, letterSpacing: '-0.03em', color: 'var(--ink-color)', margin: 0 }}>Cash Flow Planner</h1>
+        <p style={{ color: 'var(--ink-light)', fontSize: '0.85rem', lineHeight: '1.5', margin: 0 }}>
+          Recurring commitments, budget boundaries &amp; disposable cash.
         </p>
       </div>
 
       {/* Top Summaries Row */}
       <div className="grid grid-2 gap-6">
         {/* Disposable Income Card */}
-        <div className="card flex flex-col justify-between" style={{ backgroundColor: 'var(--card-bg)' }}>
-          <div className="card-title" style={{ marginBottom: 'var(--space-2)' }}>Cash Flow Summary</div>
-          
-          <div className="flex flex-col gap-3">
-            <div className="flex justify-between align-center" style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: 'var(--space-2)' }}>
-              <span style={{ fontSize: '0.85rem', color: 'var(--ink-muted)' }}>Total Inflows</span>
-              <span className="num text-gain" style={{ fontSize: '1.2rem', fontWeight: 600 }}>
-                Rs. {totalIncome.toLocaleString('en-US')}
-              </span>
-            </div>
-            <div className="flex justify-between align-center" style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: 'var(--space-2)' }}>
-              <span style={{ fontSize: '0.85rem', color: 'var(--ink-muted)' }}>Total Outflows</span>
-              <span className="num text-loss" style={{ fontSize: '1.2rem', fontWeight: 600 }}>
-                Rs. {totalExpenses.toLocaleString('en-US')}
-              </span>
+        <div className="card flex flex-col justify-between">
+          <div className="card-title" style={{ marginBottom: 'var(--space-3)' }}>Cash Flow Summary</div>
+
+          {/* Big disposable number */}
+          <div style={{ marginBottom: 'var(--space-3)' }}>
+            <span style={{ fontSize: '0.72rem', color: 'var(--ink-light)', display: 'block', marginBottom: '2px' }}>Disposable This Month</span>
+            <span className="num" style={{ fontSize: '2rem', fontWeight: 700, letterSpacing: '-0.04em', color: disposableIncome > 0 ? 'var(--emerald-gains)' : 'var(--coral-losses)' }}>
+              Rs. {disposableIncome.toLocaleString('en-US')}
+            </span>
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <div className="flex justify-between align-center">
+              <span style={{ fontSize: '0.82rem', color: 'var(--ink-muted)' }}>↑ Inflows</span>
+              <span className="num text-gain" style={{ fontWeight: 600 }}>Rs. {totalIncome.toLocaleString('en-US')}</span>
             </div>
             <div className="flex justify-between align-center">
-              <span style={{ fontSize: '0.85rem', color: 'var(--ink-muted)', fontWeight: 600 }}>Disposable Cash</span>
-              <span className="num" style={{ fontSize: '1.4rem', fontWeight: 700 }}>
-                Rs. {disposableIncome.toLocaleString('en-US')}
-              </span>
+              <span style={{ fontSize: '0.82rem', color: 'var(--ink-muted)' }}>↓ Outflows</span>
+              <span className="num text-loss" style={{ fontWeight: 600 }}>Rs. {totalExpenses.toLocaleString('en-US')}</span>
             </div>
           </div>
+
+          {/* Proportional flow bar */}
+          {(totalIncome + totalExpenses) > 0 && (
+            <div style={{ marginTop: 'var(--space-3)', paddingTop: 'var(--space-3)', borderTop: '1px solid var(--border-color)' }}>
+              <div style={{ height: '5px', borderRadius: '3px', background: 'var(--border-color)', overflow: 'hidden', display: 'flex' }}>
+                <div style={{ width: `${Math.min(100, (totalIncome / (totalIncome + totalExpenses)) * 100)}%`, background: 'var(--emerald-gains)', transition: 'width 0.6s ease' }} />
+                <div style={{ width: `${Math.min(100, (totalExpenses / (totalIncome + totalExpenses)) * 100)}%`, background: 'var(--coral-losses)', transition: 'width 0.6s ease' }} />
+              </div>
+              <div className="flex justify-between" style={{ marginTop: '4px', fontSize: '0.68rem', color: 'var(--ink-light)' }}>
+                <span style={{ color: 'var(--emerald-gains)' }}>{totalIncome > 0 ? Math.round((totalIncome / (totalIncome + totalExpenses)) * 100) : 0}% in</span>
+                <span style={{ color: 'var(--coral-losses)' }}>{totalExpenses > 0 ? Math.round((totalExpenses / (totalIncome + totalExpenses)) * 100) : 0}% out</span>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Salary Breakdown Card */}
-        <div className="card flex flex-col justify-between" style={{ backgroundColor: 'var(--card-bg)' }}>
+        <div className="card flex flex-col justify-between">
           <div>
             <div className="flex justify-between align-center">
               <span className="card-title" style={{ margin: 0 }}>Salary Components</span>
@@ -384,59 +409,30 @@ export const CashFlow: React.FC<CashFlowProps> = ({
             </p>
 
             <div className="flex flex-col gap-4">
-              <div className="flex flex-col">
-                <div className="flex justify-between align-center" style={{ fontSize: '0.9rem', fontWeight: 550 }}>
-                  <span>Needs (Essential)</span>
-                  <span className="num">{needsPct}%</span>
+              {([
+                { key: 'needs',   label: 'Needs',   sublabel: 'Essentials',  pct: needsPct,   onChange: (v: number) => handleSliderChange('needs', v) },
+                { key: 'wants',   label: 'Wants',   sublabel: 'Lifestyle',   pct: wantsPct,   onChange: (v: number) => handleSliderChange('wants', v) },
+                { key: 'savings', label: 'Savings', sublabel: '& Invest',    pct: savingsPct, onChange: (v: number) => handleSliderChange('savings', v) },
+              ] as const).map(({ key, label, sublabel, pct, onChange }) => (
+                <div key={key} className="flex flex-col" style={{ gap: '4px' }}>
+                  <div className="flex justify-between align-center">
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '5px' }}>
+                      <span style={{ fontSize: '0.88rem', fontWeight: 550, color: 'var(--ink-color)' }}>{label}</span>
+                      <span style={{ fontSize: '0.72rem', color: 'var(--ink-light)' }}>{sublabel}</span>
+                    </div>
+                    <span className="num" style={{ fontSize: '0.9rem', fontWeight: 650, color: SLIDER_COLORS[key] }}>{pct}%</span>
+                  </div>
+                  <input
+                    type="range" min="0" max="100" value={pct}
+                    onChange={(e) => onChange(parseInt(e.target.value))}
+                    className="custom-slider"
+                    style={{ background: `linear-gradient(to right, ${SLIDER_COLORS[key]} 0%, ${SLIDER_COLORS[key]} ${pct}%, var(--border-color) ${pct}%, var(--border-color) 100%)` }}
+                  />
+                  <div style={{ fontSize: '0.72rem', color: 'var(--ink-light)' }}>
+                    Target: Rs. {((totalIncome * pct) / 100).toLocaleString('en-US')}
+                  </div>
                 </div>
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  value={needsPct}
-                  onChange={(e) => handleSliderChange('needs', parseInt(e.target.value))}
-                  className="custom-slider"
-                  style={{
-                    background: `linear-gradient(to right, var(--emerald-gains) 0%, var(--emerald-gains) ${needsPct}%, rgba(128, 128, 128, 0.08) ${needsPct}%, rgba(128, 128, 128, 0.08) 100%)`
-                  }}
-                />
-              </div>
-
-              <div className="flex flex-col">
-                <div className="flex justify-between align-center" style={{ fontSize: '0.9rem', fontWeight: 550 }}>
-                  <span>Wants (Lifestyle)</span>
-                  <span className="num">{wantsPct}%</span>
-                </div>
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  value={wantsPct}
-                  onChange={(e) => handleSliderChange('wants', parseInt(e.target.value))}
-                  className="custom-slider"
-                  style={{
-                    background: `linear-gradient(to right, var(--emerald-gains) 0%, var(--emerald-gains) ${wantsPct}%, rgba(128, 128, 128, 0.08) ${wantsPct}%, rgba(128, 128, 128, 0.08) 100%)`
-                  }}
-                />
-              </div>
-
-              <div className="flex flex-col">
-                <div className="flex justify-between align-center" style={{ fontSize: '0.9rem', fontWeight: 550 }}>
-                  <span>Savings / Invest</span>
-                  <span className="num">{savingsPct}%</span>
-                </div>
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  value={savingsPct}
-                  onChange={(e) => handleSliderChange('savings', parseInt(e.target.value))}
-                  className="custom-slider"
-                  style={{
-                    background: `linear-gradient(to right, var(--emerald-gains) 0%, var(--emerald-gains) ${savingsPct}%, rgba(128, 128, 128, 0.08) ${savingsPct}%, rgba(128, 128, 128, 0.08) 100%)`
-                  }}
-                />
-              </div>
+              ))}
             </div>
           </div>
         </div>
@@ -449,60 +445,42 @@ export const CashFlow: React.FC<CashFlowProps> = ({
               How your current monthly commitments align with your target rule.
             </p>
 
-            <div className="flex flex-col gap-4">
-              {/* Needs comparison */}
-              <div className="flex flex-col gap-1">
-                <div className="flex justify-between" style={{ fontSize: '0.85rem' }}>
-                  <span style={{ fontWeight: 550 }}>Needs</span>
-                  <span className="num" style={{ color: actualNeeds > suggestedNeeds ? 'var(--coral-losses)' : 'var(--ink-muted)' }}>
-                    Rs. {actualNeeds.toLocaleString()} / Rs. {suggestedNeeds.toLocaleString()}
-                  </span>
-                </div>
-                <div style={{ height: '6px', background: 'var(--border-color)', borderRadius: '3px', overflow: 'hidden', position: 'relative' }}>
-                  <div style={{
-                    height: '100%',
-                    backgroundColor: actualNeeds > suggestedNeeds ? 'var(--coral-losses)' : 'var(--ink-color)',
-                    width: `${Math.min(100, (actualNeeds / (suggestedNeeds || 1)) * 100)}%`,
-                    borderRadius: '3px',
-                  }} />
-                </div>
-              </div>
-
-              {/* Wants comparison */}
-              <div className="flex flex-col gap-1">
-                <div className="flex justify-between" style={{ fontSize: '0.85rem' }}>
-                  <span style={{ fontWeight: 550 }}>Wants</span>
-                  <span className="num" style={{ color: actualWants > suggestedWants ? 'var(--coral-losses)' : 'var(--ink-muted)' }}>
-                    Rs. {actualWants.toLocaleString()} / Rs. {suggestedWants.toLocaleString()}
-                  </span>
-                </div>
-                <div style={{ height: '6px', background: 'var(--border-color)', borderRadius: '3px', overflow: 'hidden', position: 'relative' }}>
-                  <div style={{
-                    height: '100%',
-                    backgroundColor: actualWants > suggestedWants ? 'var(--coral-losses)' : 'var(--ink-color)',
-                    width: `${Math.min(100, (actualWants / (suggestedWants || 1)) * 100)}%`,
-                    borderRadius: '3px',
-                  }} />
-                </div>
-              </div>
-
-              {/* Savings comparison */}
-              <div className="flex flex-col gap-1">
-                <div className="flex justify-between" style={{ fontSize: '0.85rem' }}>
-                  <span style={{ fontWeight: 550 }}>Savings & Investment</span>
-                  <span className="num" style={{ color: 'var(--emerald-gains)' }}>
-                    Rs. {actualSavings.toLocaleString()} / Rs. {suggestedSavings.toLocaleString()}
-                  </span>
-                </div>
-                <div style={{ height: '6px', background: 'var(--border-color)', borderRadius: '3px', overflow: 'hidden', position: 'relative' }}>
-                  <div style={{
-                    height: '100%',
-                    backgroundColor: 'var(--emerald-gains)',
-                    width: `${Math.min(100, (actualSavings / (suggestedSavings || 1)) * 100)}%`,
-                    borderRadius: '3px',
-                  }} />
-                </div>
-              </div>
+            <div className="flex flex-col gap-5">
+              {[
+                { label: 'Needs',          actual: actualNeeds,   suggested: suggestedNeeds,   overIsBad: true,  color: SLIDER_COLORS.needs },
+                { label: 'Wants',          actual: actualWants,   suggested: suggestedWants,   overIsBad: true,  color: SLIDER_COLORS.wants },
+                { label: 'Savings & Invest', actual: actualSavings, suggested: suggestedSavings, overIsBad: false, color: SLIDER_COLORS.savings },
+              ].map(({ label, actual, suggested, overIsBad, color }) => {
+                const pct = Math.min(100, suggested > 0 ? (actual / suggested) * 100 : 0);
+                const isOver = actual > suggested;
+                const barColor = overIsBad
+                  ? (isOver ? 'var(--coral-losses)' : color)
+                  : (isOver ? color : 'var(--coral-losses)');
+                const textColor = overIsBad
+                  ? (isOver ? 'var(--coral-losses)' : 'var(--ink-muted)')
+                  : (isOver ? 'var(--emerald-gains)' : 'var(--coral-losses)');
+                const status = overIsBad
+                  ? (isOver ? 'Over budget' : 'Within target')
+                  : (isOver ? 'Above target ✓' : 'Below target');
+                return (
+                  <div key={label} className="flex flex-col" style={{ gap: '5px' }}>
+                    <div className="flex justify-between align-center">
+                      <span style={{ fontSize: '0.85rem', fontWeight: 550 }}>{label}</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span style={{ fontSize: '0.7rem', color: textColor, fontWeight: 600 }}>{status}</span>
+                        <span className="num" style={{ fontSize: '0.8rem', color: textColor, fontWeight: 650 }}>{Math.round(pct)}%</span>
+                      </div>
+                    </div>
+                    <div style={{ height: '6px', background: 'var(--border-color)', borderRadius: '3px', overflow: 'hidden' }}>
+                      <div style={{ height: '100%', width: `${pct}%`, background: barColor, borderRadius: '3px', transition: 'width 0.5s ease' }} />
+                    </div>
+                    <div className="flex justify-between" style={{ fontSize: '0.72rem', color: 'var(--ink-light)' }}>
+                      <span>Actual: Rs. {actual.toLocaleString('en-US')}</span>
+                      <span>Target: Rs. {suggested.toLocaleString('en-US')}</span>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>
@@ -800,43 +778,39 @@ export const CashFlow: React.FC<CashFlowProps> = ({
 
         {/* Right: Active list of contracts */}
         <div className="card flex flex-col gap-4">
-          <div className="card-title">Contracts List</div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div className="card-title" style={{ margin: 0 }}>Active Contracts</div>
+            <div style={{ display: 'flex', gap: '12px', fontSize: '0.78rem' }}>
+              <span style={{ color: 'var(--emerald-gains)', fontWeight: 600 }}>{incomeItems.length} inflow{incomeItems.length !== 1 ? 's' : ''}</span>
+              <span style={{ color: 'var(--coral-losses)', fontWeight: 600 }}>{expenseItems.length} outflow{expenseItems.length !== 1 ? 's' : ''}</span>
+            </div>
+          </div>
 
-          <div style={{ overflowY: 'auto', maxHeight: '340px' }} className="flex flex-col gap-4">
+          <div style={{ overflowY: 'auto', maxHeight: '360px' }} className="flex flex-col gap-4">
             {/* Inflows */}
             <div>
-              <span style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--emerald-gains)', textTransform: 'uppercase' }}>Inflows</span>
+              <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--emerald-gains)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '4px', paddingBottom: '4px', borderBottom: '1px solid var(--border-color)' }}>Inflows</div>
               {incomeItems.length === 0 ? (
                 <div style={{ fontSize: '0.85rem', color: 'var(--ink-light)', padding: 'var(--space-2) 0' }}>No active inflows</div>
               ) : (
                 incomeItems.map(item => (
-                  <div key={item.id} className="flex justify-between align-center" style={{
-                    padding: '8px 0',
-                    borderBottom: '1px solid var(--border-color)',
-                  }}>
-                    <div className="flex flex-col" style={{ flex: 1, paddingRight: 'var(--space-2)' }}>
-                      <span style={{ fontWeight: 550, fontSize: '0.9rem' }}>{item.description}</span>
+                  <div key={item.id} className="flex justify-between align-center" style={{ padding: '10px 0', borderBottom: '1px solid var(--border-color)' }}>
+                    <div className="flex flex-col" style={{ flex: 1, paddingRight: 'var(--space-2)', minWidth: 0 }}>
+                      <span style={{ fontWeight: 550, fontSize: '0.9rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.description}</span>
+                      <span style={{ fontSize: '0.72rem', color: 'var(--emerald-gains)', fontWeight: 600, marginTop: '2px' }}>Monthly Inflow</span>
                     </div>
                     {confirmDeleteId === item.id ? (
-                      <div className="flex align-center gap-2" style={{ backgroundColor: 'rgba(232, 93, 93, 0.05)', padding: '4px 8px', borderRadius: '4px' }}>
+                      <div className="flex align-center gap-2" style={{ background: 'var(--coral-losses-bg)', padding: '4px 8px', borderRadius: '6px' }}>
                         <span style={{ fontSize: '0.75rem', color: 'var(--coral-losses)', fontWeight: 600 }}>Sure?</span>
-                        <button type="button" className="btn-text" style={{ fontSize: '0.75rem', color: 'var(--coral-losses)', padding: '2px 4px', fontWeight: 650 }} onClick={() => { onRemoveRecurring(item.id); setConfirmDeleteId(null); }}>
-                          Delete
-                        </button>
-                        <span style={{ color: 'var(--border-color)', fontSize: '0.75rem' }}>|</span>
-                        <button type="button" className="btn-text" style={{ fontSize: '0.75rem', color: 'var(--ink-muted)', padding: '2px 4px' }} onClick={() => setConfirmDeleteId(null)}>
-                          Cancel
-                        </button>
+                        <button type="button" style={{ fontSize: '0.75rem', color: 'var(--coral-losses)', padding: '2px 4px', fontWeight: 650, background: 'none', border: 'none', cursor: 'pointer' }} onClick={() => { onRemoveRecurring(item.id); setConfirmDeleteId(null); }}>Delete</button>
+                        <span style={{ color: 'var(--border-color)' }}>|</span>
+                        <button type="button" style={{ fontSize: '0.75rem', color: 'var(--ink-muted)', padding: '2px 4px', background: 'none', border: 'none', cursor: 'pointer' }} onClick={() => setConfirmDeleteId(null)}>Cancel</button>
                       </div>
                     ) : (
-                      <div className="flex align-center gap-3">
-                        <span className="num text-gain" style={{ fontWeight: 650 }}>Rs. {item.amount.toLocaleString()}</span>
-                        <button type="button" className="icon-btn" title="Edit" onClick={() => startEdit(item)}>
-                          <Edit2 size={16} />
-                        </button>
-                        <button type="button" className="icon-btn icon-btn-danger" title="Delete" onClick={() => setConfirmDeleteId(item.id)}>
-                          <Trash2 size={16} />
-                        </button>
+                      <div className="flex align-center gap-3" style={{ flexShrink: 0 }}>
+                        <span className="num text-gain" style={{ fontWeight: 650, fontSize: '0.9rem' }}>Rs. {item.amount.toLocaleString()}</span>
+                        <button type="button" className="icon-btn" title="Edit" onClick={() => startEdit(item)}><Edit2 size={15} /></button>
+                        <button type="button" className="icon-btn icon-btn-danger" title="Delete" onClick={() => setConfirmDeleteId(item.id)}><Trash2 size={15} /></button>
                       </div>
                     )}
                   </div>
@@ -846,45 +820,39 @@ export const CashFlow: React.FC<CashFlowProps> = ({
 
             {/* Outflows */}
             <div>
-              <span style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--coral-losses)', textTransform: 'uppercase' }}>Outflows</span>
+              <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--coral-losses)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '4px', paddingBottom: '4px', borderBottom: '1px solid var(--border-color)' }}>Outflows</div>
               {expenseItems.length === 0 ? (
                 <div style={{ fontSize: '0.85rem', color: 'var(--ink-light)', padding: 'var(--space-2) 0' }}>No active outflows</div>
               ) : (
-                expenseItems.map(item => (
-                  <div key={item.id} className="flex justify-between align-center" style={{
-                    padding: '8px 0',
-                    borderBottom: '1px solid var(--border-color)',
-                  }}>
-                    <div className="flex flex-col" style={{ flex: 1, paddingRight: 'var(--space-2)' }}>
-                       <span style={{ fontWeight: 550, fontSize: '0.9rem' }}>{item.description}</span>
-                       <span style={{ fontSize: '0.75rem', color: 'var(--ink-light)' }}>
-                         {parseCategory(item.category).name} <span style={{ opacity: 0.5 }}>•</span> <span style={{ textTransform: 'capitalize' }}>{parseCategory(item.category).classification}</span>
-                       </span>
+                expenseItems.map(item => {
+                  const { classification, name } = parseCategory(item.category);
+                  const chipStyle = getCategoryStyle(classification);
+                  return (
+                    <div key={item.id} className="flex justify-between align-center" style={{ padding: '10px 0', borderBottom: '1px solid var(--border-color)' }}>
+                      <div className="flex flex-col" style={{ flex: 1, paddingRight: 'var(--space-2)', minWidth: 0 }}>
+                        <span style={{ fontWeight: 550, fontSize: '0.9rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.description}</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginTop: '3px' }}>
+                          <span style={{ fontSize: '0.68rem', fontWeight: 650, color: chipStyle.color, background: chipStyle.bg, padding: '1px 6px', borderRadius: '4px', textTransform: 'capitalize' }}>{classification}</span>
+                          <span style={{ fontSize: '0.72rem', color: 'var(--ink-light)' }}>{name}</span>
+                        </div>
+                      </div>
+                      {confirmDeleteId === item.id ? (
+                        <div className="flex align-center gap-2" style={{ background: 'var(--coral-losses-bg)', padding: '4px 8px', borderRadius: '6px' }}>
+                          <span style={{ fontSize: '0.75rem', color: 'var(--coral-losses)', fontWeight: 600 }}>Sure?</span>
+                          <button type="button" style={{ fontSize: '0.75rem', color: 'var(--coral-losses)', padding: '2px 4px', fontWeight: 650, background: 'none', border: 'none', cursor: 'pointer' }} onClick={() => { onRemoveRecurring(item.id); setConfirmDeleteId(null); }}>Delete</button>
+                          <span style={{ color: 'var(--border-color)' }}>|</span>
+                          <button type="button" style={{ fontSize: '0.75rem', color: 'var(--ink-muted)', padding: '2px 4px', background: 'none', border: 'none', cursor: 'pointer' }} onClick={() => setConfirmDeleteId(null)}>Cancel</button>
+                        </div>
+                      ) : (
+                        <div className="flex align-center gap-3" style={{ flexShrink: 0 }}>
+                          <span className="num text-loss" style={{ fontWeight: 650, fontSize: '0.9rem' }}>Rs. {item.amount.toLocaleString()}</span>
+                          <button type="button" className="icon-btn" title="Edit" onClick={() => startEdit(item)}><Edit2 size={15} /></button>
+                          <button type="button" className="icon-btn icon-btn-danger" title="Delete" onClick={() => setConfirmDeleteId(item.id)}><Trash2 size={15} /></button>
+                        </div>
+                      )}
                     </div>
-                    {confirmDeleteId === item.id ? (
-                      <div className="flex align-center gap-2" style={{ backgroundColor: 'rgba(232, 93, 93, 0.05)', padding: '4px 8px', borderRadius: '4px' }}>
-                        <span style={{ fontSize: '0.75rem', color: 'var(--coral-losses)', fontWeight: 600 }}>Sure?</span>
-                        <button type="button" className="btn-text" style={{ fontSize: '0.75rem', color: 'var(--coral-losses)', padding: '2px 4px', fontWeight: 650 }} onClick={() => { onRemoveRecurring(item.id); setConfirmDeleteId(null); }}>
-                          Delete
-                        </button>
-                        <span style={{ color: 'var(--border-color)', fontSize: '0.75rem' }}>|</span>
-                        <button type="button" className="btn-text" style={{ fontSize: '0.75rem', color: 'var(--ink-muted)', padding: '2px 4px' }} onClick={() => setConfirmDeleteId(null)}>
-                          Cancel
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="flex align-center gap-3">
-                        <span className="num text-loss" style={{ fontWeight: 650 }}>Rs. {item.amount.toLocaleString()}</span>
-                        <button type="button" className="icon-btn" title="Edit" onClick={() => startEdit(item)}>
-                          <Edit2 size={16} />
-                        </button>
-                        <button type="button" className="icon-btn icon-btn-danger" title="Delete" onClick={() => setConfirmDeleteId(item.id)}>
-                          <Trash2 size={16} />
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
           </div>

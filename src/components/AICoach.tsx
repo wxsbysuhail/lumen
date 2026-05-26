@@ -190,48 +190,85 @@ Guidelines:
     "Explain compound interest.",
   ];
 
-  // Helper to format bold and list formatting into React nodes
+  // Parses **bold** within a string into React nodes
+  const parseBold = (str: string): React.ReactNode[] => {
+    const parts: React.ReactNode[] = [];
+    let current = str;
+    let idx = current.indexOf('**');
+    while (idx !== -1) {
+      const end = current.indexOf('**', idx + 2);
+      if (end === -1) break;
+      if (idx > 0) parts.push(current.substring(0, idx));
+      parts.push(<strong key={`b-${idx}`} style={{ fontWeight: 700 }}>{current.substring(idx + 2, end)}</strong>);
+      current = current.substring(end + 2);
+      idx = current.indexOf('**');
+    }
+    parts.push(current);
+    return parts;
+  };
+
+  // Full markdown-aware formatter: headings, bullets, numbered lists, hr, bold
   const formatMessageText = (text: string) => {
     const lines = text.split('\n');
-    return lines.map((line, idx) => {
-      let cleanLine = line.trim();
-      if (!cleanLine && line) return <div key={idx} style={{ height: '8px' }} />;
-      
-      const isBullet = cleanLine.startsWith('* ') || cleanLine.startsWith('- ');
-      if (isBullet) {
-        cleanLine = cleanLine.substring(2);
+    const result: React.ReactNode[] = [];
+    let bulletGroup: React.ReactNode[] = [];
+    let numberedGroup: React.ReactNode[] = [];
+
+    const flushBullets = () => {
+      if (bulletGroup.length > 0) {
+        result.push(<ul key={`ul-${result.length}`} style={{ margin: '4px 0 8px 16px', paddingLeft: '4px', listStyleType: 'disc' }}>{bulletGroup}</ul>);
+        bulletGroup = [];
       }
-      
-      const parts = [];
-      let currentText = cleanLine;
-      let boldIndex = currentText.indexOf('**');
-      
-      while (boldIndex !== -1) {
-        const closingIndex = currentText.indexOf('**', boldIndex + 2);
-        if (closingIndex === -1) break;
-        
-        parts.push(currentText.substring(0, boldIndex));
-        parts.push(<strong key={boldIndex} style={{ fontWeight: 700, color: 'var(--ink-color)' }}>{currentText.substring(boldIndex + 2, closingIndex)}</strong>);
-        
-        currentText = currentText.substring(closingIndex + 2);
-        boldIndex = currentText.indexOf('**');
+    };
+    const flushNumbered = () => {
+      if (numberedGroup.length > 0) {
+        result.push(<ol key={`ol-${result.length}`} style={{ margin: '4px 0 8px 16px', paddingLeft: '4px' }}>{numberedGroup}</ol>);
+        numberedGroup = [];
       }
-      parts.push(currentText);
-      
-      if (isBullet) {
-        return (
-          <li key={idx} style={{ marginLeft: '16px', marginBottom: '6px', listStyleType: 'disc', color: 'var(--ink-color)' }}>
-            {parts}
-          </li>
-        );
+    };
+
+    lines.forEach((line, i) => {
+      const trimmed = line.trim();
+
+      if (!trimmed) {
+        flushBullets(); flushNumbered();
+        result.push(<div key={`g-${i}`} style={{ height: '5px' }} />);
+        return;
       }
-      
-      return (
-        <p key={idx} style={{ marginBottom: '8px', lineHeight: '1.5' }}>
-          {parts}
-        </p>
-      );
+      if (trimmed === '---' || trimmed === '***') {
+        flushBullets(); flushNumbered();
+        result.push(<hr key={`hr-${i}`} style={{ border: 'none', borderTop: '1px solid var(--border-color)', margin: '8px 0' }} />);
+        return;
+      }
+      if (trimmed.startsWith('## ')) {
+        flushBullets(); flushNumbered();
+        result.push(<h3 key={i} style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--ink-color)', margin: '10px 0 4px 0', letterSpacing: '-0.01em' }}>{parseBold(trimmed.slice(3))}</h3>);
+        return;
+      }
+      if (trimmed.startsWith('### ') || trimmed.startsWith('#### ')) {
+        flushBullets(); flushNumbered();
+        const lvl = trimmed.startsWith('#### ') ? 5 : 4;
+        result.push(<h4 key={i} style={{ fontSize: '0.88rem', fontWeight: 700, color: 'var(--ink-color)', margin: '8px 0 3px 0' }}>{parseBold(trimmed.slice(lvl))}</h4>);
+        return;
+      }
+      if (trimmed.startsWith('* ') || trimmed.startsWith('- ')) {
+        flushNumbered();
+        bulletGroup.push(<li key={i} style={{ marginBottom: '3px', lineHeight: '1.55' }}>{parseBold(trimmed.slice(2))}</li>);
+        return;
+      }
+      const numMatch = trimmed.match(/^(\d+)\.\s(.+)/);
+      if (numMatch) {
+        flushBullets();
+        numberedGroup.push(<li key={i} style={{ marginBottom: '3px', lineHeight: '1.55' }}>{parseBold(numMatch[2])}</li>);
+        return;
+      }
+      flushBullets(); flushNumbered();
+      result.push(<p key={i} style={{ marginBottom: '5px', lineHeight: '1.6' }}>{parseBold(trimmed)}</p>);
     });
+
+    flushBullets();
+    flushNumbered();
+    return result;
   };
 
   const transition = { duration: 0.5, ease: [0.16, 1, 0.3, 1] as [number, number, number, number] };
@@ -242,43 +279,46 @@ Guidelines:
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -15 }}
       transition={transition}
-      className="flex flex-col gap-6"
-      style={{ height: 'calc(100vh - 220px)', minHeight: '500px' }}
+      style={{ display: 'flex', flexDirection: 'column', gap: '1rem', height: 'calc(100vh - 200px)', minHeight: '520px' }}
     >
-      <div className="flex justify-between align-center">
-        <div className="flex flex-col gap-1">
-          <h1 className="serif-title" style={{ fontSize: '2.5rem', fontWeight: 400, fontStyle: 'italic' }}>AI Financial Coach</h1>
-          <p style={{ color: 'var(--ink-muted)' }}>Conversational budget queries and personalized optimization models.</p>
+      {/* Header */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          <h1 style={{ fontFamily: 'var(--font-sans)', fontSize: '1.75rem', fontWeight: 700, letterSpacing: '-0.03em', color: 'var(--ink-color)', margin: 0 }}>AI Financial Coach</h1>
+          <p style={{ color: 'var(--ink-light)', fontSize: '0.85rem', lineHeight: '1.5', margin: 0 }}>
+            Context-aware advice · Powered by Gemini · Your live data is included
+          </p>
         </div>
-        <div className="flex gap-2">
-          <button
-            className="btn btn-secondary"
-            style={{ padding: '6px 12px', fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '6px' }}
-            onClick={handleClearHistory}
-          >
-            <Trash2 size={13} />
-            Reset Chat
+        <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
+          <button className="btn btn-secondary" style={{ padding: '6px 12px', fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '5px' }} onClick={handleClearHistory}>
+            <Trash2 size={13} /> Reset
           </button>
-          <button
-            className="btn btn-secondary"
-            style={{ 
-              padding: '6px 12px', 
-              fontSize: '0.78rem', 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: '6px', 
-              color: showKeySetup ? 'var(--emerald-gains)' : 'var(--ink-color)' 
-            }}
-            onClick={() => setShowKeySetup(!showKeySetup)}
-          >
-            <Key size={13} />
-            {apiKey ? 'API Settings' : 'Configure Key'}
+          <button className="btn btn-secondary"
+            style={{ padding: '6px 12px', fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '5px', color: showKeySetup ? 'var(--emerald-gains)' : 'var(--ink-color)' }}
+            onClick={() => setShowKeySetup(!showKeySetup)}>
+            <Key size={13} /> {apiKey ? 'API Key ✓' : 'Set API Key'}
           </button>
         </div>
       </div>
 
+      {/* Live context pills */}
+      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+        {[
+          { label: 'Balance', value: `Rs. ${balance.toLocaleString('en-US')}` },
+          { label: 'Income', value: `Rs. ${monthlyIncome.toLocaleString('en-US')} /mo` },
+          { label: 'Expenses', value: `Rs. ${totalExpenses.toLocaleString('en-US')} /mo` },
+          { label: 'Savings targets', value: `Rs. ${savingsTargetsSum.toLocaleString('en-US')}` },
+          { label: 'Transactions', value: `${Math.min(transactions.length, 15)} loaded` },
+        ].map(({ label, value }) => (
+          <div key={label} style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '3px 10px', background: 'var(--nav-pill-bg)', border: '1px solid var(--border-color)', borderRadius: '999px', fontSize: '0.72rem', whiteSpace: 'nowrap' }}>
+            <span style={{ color: 'var(--ink-light)' }}>{label}</span>
+            <span className="num" style={{ color: 'var(--ink-color)', fontWeight: 650 }}>{value}</span>
+          </div>
+        ))}
+      </div>
+
       {/* CHAT VIEW */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }} className="card">
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', padding: '1.25rem' }} className="card">
         {showKeySetup && (
           <motion.div
             initial={{ height: 0, opacity: 0 }}
@@ -369,7 +409,7 @@ Guidelines:
             <button 
               className="btn btn-secondary" 
               style={{ fontSize: '0.72rem', padding: '2px 8px', borderColor: 'var(--coral-losses)', color: 'var(--coral-losses)' }} 
-              onClick={() => handleSend(messages[messages.length - 1]?.text || '')}
+              onClick={() => handleSend(inputVal)}
             >
               Retry
             </button>
@@ -377,31 +417,28 @@ Guidelines:
         )}
 
         {/* Messages Scroll Area */}
-        <div style={{ flex: 1, overflowY: 'auto', paddingRight: '4px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div style={{ flex: 1, overflowY: 'auto', paddingRight: '4px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
           {messages.map((msg, idx) => {
             const isUser = msg.role === 'user';
             return (
-              <div
-                key={idx}
-                style={{
-                  display: 'flex',
-                  justifyContent: isUser ? 'flex-end' : 'flex-start',
-                  width: '100%',
-                }}
-              >
-                <div
-                  style={{
-                    maxWidth: '80%',
-                    padding: '12px 16px',
-                    borderRadius: '16px',
-                    borderBottomRightRadius: isUser ? '4px' : '16px',
-                    borderBottomLeftRadius: isUser ? '16px' : '4px',
-                    backgroundColor: isUser ? 'var(--emerald-gains-bg)' : 'var(--bg-color)',
-                    border: isUser ? '1px solid rgba(16, 185, 129, 0.2)' : '1px solid var(--border-color)',
-                    fontSize: '0.85rem',
-                    color: 'var(--ink-color)',
-                  }}
-                >
+              <div key={idx} style={{ display: 'flex', justifyContent: isUser ? 'flex-end' : 'flex-start', alignItems: 'flex-end', gap: '8px', width: '100%' }}>
+                {!isUser && (
+                  <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'var(--emerald-gains-bg)', border: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginBottom: '2px' }}>
+                    <Sparkles size={13} style={{ color: 'var(--emerald-gains)' }} />
+                  </div>
+                )}
+                <div style={{
+                  maxWidth: '78%',
+                  padding: '11px 15px',
+                  borderRadius: '16px',
+                  borderBottomRightRadius: isUser ? '4px' : '16px',
+                  borderBottomLeftRadius: isUser ? '16px' : '4px',
+                  background: isUser ? 'var(--emerald-gains-bg)' : 'var(--nav-pill-bg)',
+                  border: isUser ? '1px solid var(--emerald-gains)' : '1px solid var(--border-color)',
+                  fontSize: '0.855rem',
+                  color: 'var(--ink-color)',
+                  lineHeight: '1.55',
+                }}>
                   {formatMessageText(msg.text)}
                 </div>
               </div>
@@ -409,21 +446,15 @@ Guidelines:
           })}
           
           {loading && (
-            <div style={{ display: 'flex', justifyContent: 'flex-start', width: '100%' }}>
-              <div style={{
-                padding: '12px 16px',
-                borderRadius: '16px',
-                borderBottomLeftRadius: '4px',
-                backgroundColor: 'var(--bg-color)',
-                border: '1px solid var(--border-color)',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                fontSize: '0.8rem',
-                color: 'var(--ink-muted)'
-              }}>
-                <Loader2 className="animate-spin" size={14} style={{ color: 'var(--emerald-gains)' }} />
-                <span>Lumen AI is formulating options...</span>
+            <div style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'flex-end', gap: '8px', width: '100%' }}>
+              <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'var(--emerald-gains-bg)', border: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <Sparkles size={13} style={{ color: 'var(--emerald-gains)' }} />
+              </div>
+              <div style={{ padding: '11px 15px', borderRadius: '16px', borderBottomLeftRadius: '4px', background: 'var(--nav-pill-bg)', border: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.82rem', color: 'var(--ink-muted)' }}>
+                <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}>
+                  <Loader2 size={14} style={{ color: 'var(--emerald-gains)', display: 'block' }} />
+                </motion.div>
+                <span>Lumen AI is thinking...</span>
               </div>
             </div>
           )}
@@ -431,18 +462,14 @@ Guidelines:
           <div ref={chatEndRef} />
         </div>
 
-        {/* Quick suggestions chips */}
-        {messages.length === 1 && !loading && (
-          <div className="flex flex-wrap gap-2" style={{ padding: '16px 0 8px 0', borderTop: '1px solid var(--border-color)', marginTop: '16px' }}>
+        {/* Quick suggestion chips — shown when input is empty and not loading */}
+        {!loading && !inputVal.trim() && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', padding: '12px 0 4px 0', borderTop: '1px solid var(--border-color)', marginTop: '12px' }}>
             {suggestionChips.map((chip, idx) => (
-              <button
-                key={idx}
-                type="button"
-                className="btn btn-secondary"
-                style={{ borderRadius: '16px', padding: '6px 12px', fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '4px' }}
-                onClick={() => handleSend(chip)}
-              >
-                <Sparkles size={11} style={{ color: 'var(--emerald-gains)' }} />
+              <button key={idx} type="button" className="btn btn-secondary"
+                style={{ borderRadius: '999px', padding: '5px 11px', fontSize: '0.76rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                onClick={() => handleSend(chip)}>
+                <Sparkles size={10} style={{ color: 'var(--emerald-gains)' }} />
                 {chip}
               </button>
             ))}
@@ -455,38 +482,27 @@ Guidelines:
           alignItems: 'center',
           gap: '8px',
           borderTop: '1px solid var(--border-color)',
-          paddingTop: '16px',
-          marginTop: messages.length === 1 ? '0' : '16px'
+          paddingTop: '14px',
+          marginTop: '12px',
         }}>
           <input
             type="text"
-            placeholder="Ask anything about your ledger, runway, or savings targets..."
+            placeholder="Ask about your runway, savings rate, transactions..."
             value={inputVal}
             onChange={(e) => setInputVal(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleSend(inputVal)}
+            onKeyDown={(e) => e.key === 'Enter' && !loading && handleSend(inputVal)}
             className="input-field"
-            style={{ flex: 1, fontSize: '0.85rem' }}
+            style={{ flex: 1, fontSize: '0.875rem' }}
             disabled={loading}
           />
           <button
             type="button"
             className="btn btn-primary"
-            style={{
-              width: '40px',
-              height: '40px',
-              minWidth: '40px',
-              borderRadius: '50%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              padding: 0,
-              backgroundColor: 'var(--ink-color)',
-              color: 'var(--bg-color)',
-            }}
+            style={{ width: '40px', height: '40px', minWidth: '40px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, flexShrink: 0 }}
             onClick={() => handleSend(inputVal)}
             disabled={loading || !inputVal.trim()}
           >
-            <Send size={16} />
+            <Send size={15} />
           </button>
         </div>
       </div>

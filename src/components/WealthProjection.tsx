@@ -149,12 +149,12 @@ export const WealthProjection: React.FC<WealthProjectionProps> = ({
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -15 }}
       transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-      className="flex flex-col gap-8"
+      style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}
     >
-      <div className="flex flex-col gap-2">
-        <h1 className="serif-title" style={{ fontSize: '2.5rem', fontWeight: 400, fontStyle: 'italic' }}>Wealth Projection</h1>
-        <p style={{ color: 'var(--ink-muted)' }}>
-          Visualize compound growth potential over up to 30 years based on recurring contributions.
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+        <h1 style={{ fontFamily: 'var(--font-sans)', fontSize: '1.75rem', fontWeight: 700, letterSpacing: '-0.03em', color: 'var(--ink-color)', margin: 0 }}>Wealth Projection</h1>
+        <p style={{ color: 'var(--ink-light)', fontSize: '0.85rem', lineHeight: '1.5', margin: 0 }}>
+          Compound growth simulator · 30-year horizon · Adjustable yield & monthly contribution
         </p>
       </div>
 

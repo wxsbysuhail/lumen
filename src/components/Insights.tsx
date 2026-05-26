@@ -347,16 +347,16 @@ export const Insights: React.FC<InsightsProps> = ({
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -15 }}
       transition={transition}
-      className="flex flex-col gap-8"
+      style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}
     >
-      <div className="flex flex-col gap-2">
-        <h1 className="serif-title" style={{ fontSize: '2.5rem', fontWeight: 400, fontStyle: 'italic' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+        <h1 style={{ fontFamily: 'var(--font-sans)', fontSize: '1.75rem', fontWeight: 700, letterSpacing: '-0.03em', color: 'var(--ink-color)', margin: 0 }}>
           {mainTab === 'advisory' ? 'Financial Advisory Center' : 'Budget Simulation Playroom'}
         </h1>
-        <p style={{ color: 'var(--ink-muted)' }}>
+        <p style={{ color: 'var(--ink-light)', fontSize: '0.85rem', lineHeight: '1.5', margin: 0 }}>
           {mainTab === 'advisory'
-            ? 'Interactive tools and customized columns based on your runway levels, goals, and savings rates.'
-            : 'Adjust hypothetical parameters to visualize your future net worth trajectory side-by-side.'}
+            ? 'Personalised runway tools, milestone tracker & categorised wealth advice.'
+            : 'Adjust hypothetical parameters to visualise your 10-year net worth trajectory.'}
         </p>
       </div>
 
@@ -402,10 +402,10 @@ export const Insights: React.FC<InsightsProps> = ({
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -15 }}
             transition={transition}
-            className="grid grid-2 gap-8"
+            style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}
           >
             {/* Left Hand: Interactive Tools Column */}
-            <div className="flex flex-col gap-6">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
               
               {/* Tool 1: Emergency Runway Calculator */}
               <div className="card flex flex-col gap-4">
@@ -447,6 +447,7 @@ export const Insights: React.FC<InsightsProps> = ({
                       transition={transition}
                       style={{
                         height: '100%',
+                        borderRadius: '3px',
                         backgroundColor: runwayPct >= 100 ? 'var(--emerald-gains)' : 'var(--coral-losses)',
                       }}
                     />
@@ -523,7 +524,7 @@ export const Insights: React.FC<InsightsProps> = ({
             </div>
 
             {/* Right Hand: Categorized Tips Column */}
-            <div className="flex flex-col gap-6">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
               {/* Sub Navigation Category Tabs */}
               <div className="segmented-control">
                 <button
@@ -616,7 +617,7 @@ export const Insights: React.FC<InsightsProps> = ({
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -15 }}
             transition={transition}
-            className="flex flex-col gap-8"
+            style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}
           >
             {/* Chart Card */}
             <div className="card flex flex-col gap-4" style={{ position: 'relative', overflow: 'visible', backgroundColor: 'var(--card-bg)' }}>
@@ -795,10 +796,10 @@ export const Insights: React.FC<InsightsProps> = ({
             </div>
 
             {/* Sliders and Metrics Row */}
-            <div className="grid grid-2 gap-8">
-              
+            <div className="grid grid-2 gap-6">
+
               {/* Sliders Card */}
-              <div className="card flex flex-col gap-6" style={{ backgroundColor: 'var(--card-bg)' }}>
+              <div className="card flex flex-col gap-6">
                 <span className="card-title" style={{ margin: 0 }}>Sandbox Controls</span>
                 
                 {/* Slider 1: Raise */}
@@ -876,7 +877,7 @@ export const Insights: React.FC<InsightsProps> = ({
               </div>
 
               {/* Metrics Card */}
-              <div className="card flex flex-col gap-6" style={{ backgroundColor: 'var(--card-bg)' }}>
+              <div className="card flex flex-col gap-6">
                 <span className="card-title" style={{ margin: 0 }}>Simulation Impact (10-Year View)</span>
 
                 <div className="flex flex-col gap-4" style={{ flex: 1 }}>
@@ -886,7 +887,7 @@ export const Insights: React.FC<InsightsProps> = ({
                     padding: '16px',
                     borderRadius: '16px',
                     border: '1px solid var(--border-color)',
-                    background: 'var(--bg-color)',
+                    background: 'var(--nav-pill-bg)',
                     display: 'flex',
                     flexDirection: 'column',
                     gap: '4px'
@@ -918,7 +919,7 @@ export const Insights: React.FC<InsightsProps> = ({
                     padding: '16px',
                     borderRadius: '16px',
                     border: '1px solid var(--border-color)',
-                    background: 'var(--bg-color)',
+                    background: 'var(--nav-pill-bg)',
                     display: 'flex',
                     flexDirection: 'column',
                     gap: '4px'
@@ -952,7 +953,7 @@ export const Insights: React.FC<InsightsProps> = ({
                     padding: '16px',
                     borderRadius: '16px',
                     border: '1px solid var(--border-color)',
-                    background: 'var(--bg-color)',
+                    background: 'var(--nav-pill-bg)',
                     display: 'flex',
                     flexDirection: 'column',
                     gap: '4px'

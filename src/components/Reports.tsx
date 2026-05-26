@@ -348,14 +348,14 @@ export const Reports: React.FC<ReportsProps> = ({
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -15 }}
       transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-      className="flex flex-col gap-8"
+      style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}
     >
       {/* Title & Filter Header */}
-      <div className="flex justify-between align-center flex-wrap gap-4">
-        <div className="flex flex-col gap-2">
-          <h1 className="serif-title" style={{ fontSize: '2.5rem', fontWeight: 400, fontStyle: 'italic' }}>Financial Reports</h1>
-          <p style={{ color: 'var(--ink-muted)' }}>
-            Empathetic cash analytics, burn velocity, and predictive forecasting engine.
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          <h1 style={{ fontFamily: 'var(--font-sans)', fontSize: '1.75rem', fontWeight: 700, letterSpacing: '-0.03em', color: 'var(--ink-color)', margin: 0 }}>Financial Reports</h1>
+          <p style={{ color: 'var(--ink-light)', fontSize: '0.85rem', lineHeight: '1.5', margin: 0 }}>
+            Burn velocity · Runway forecast · Category breakdown · AI narrative
           </p>
         </div>
         
@@ -379,47 +379,69 @@ export const Reports: React.FC<ReportsProps> = ({
 
       {/* Reports Metrics Grid */}
       <div className="reports-grid">
-        {/* Outflows */}
+        {/* Inflows */}
         <div className="report-metric-card">
-          <div className="report-metric-title">Outflows Sum</div>
-          <div className="report-metric-val text-loss" style={{ color: 'var(--coral-losses)' }}>
-            Rs. {metrics.totalOutflows.toLocaleString()}
+          <div className="report-metric-title">Total Inflows</div>
+          <div className="report-metric-val" style={{ color: 'var(--emerald-gains)' }}>
+            Rs. {metrics.totalInflows.toLocaleString()}
           </div>
           <div className="report-metric-sub">
-            Across {filteredTransactions.filter(t => t.type === 'expense').length} entries
+            {filteredTransactions.filter(t => t.type === 'income').length} income entries
           </div>
         </div>
 
-        {/* Daily Burn Rate */}
+        {/* Outflows */}
         <div className="report-metric-card">
-          <div className="report-metric-title">Daily Burn Velocity</div>
-          <div className="report-metric-val">
-            Rs. {Math.round(metrics.dailyBurnRate).toLocaleString()}
+          <div className="report-metric-title">Total Outflows</div>
+          <div className="report-metric-val" style={{ color: 'var(--coral-losses)' }}>
+            Rs. {metrics.totalOutflows.toLocaleString()}
           </div>
           <div className="report-metric-sub">
-            Calculated over {metrics.days} days
+            {filteredTransactions.filter(t => t.type === 'expense').length} expense entries
+          </div>
+        </div>
+
+        {/* Savings Rate */}
+        <div className="report-metric-card">
+          <div className="report-metric-title">Savings Rate</div>
+          <div className="report-metric-val" style={{ color: metrics.savingsRate >= 20 ? 'var(--emerald-gains)' : metrics.savingsRate > 0 ? 'var(--ink-color)' : 'var(--coral-losses)' }}>
+            {metrics.savingsRate.toFixed(1)}%
+          </div>
+          <div className="report-metric-sub">
+            {metrics.savingsRate >= 20 ? 'Above 20% target ✓' : metrics.savingsRate > 0 ? 'Below 20% target' : 'Deficit period'}
           </div>
         </div>
 
         {/* Primary Driver */}
         <div className="report-metric-card">
-          <div className="report-metric-title">Primary Driver</div>
-          <div className="report-metric-val" style={{ fontSize: '1.25rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontWeight: 650 }}>
+          <div className="report-metric-title">Top Spend Category</div>
+          <div className="report-metric-val" style={{ fontSize: '1.15rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontWeight: 700 }}>
             {metrics.topCategory}
           </div>
           <div className="report-metric-sub">
-            Rs. {metrics.topCategoryValue.toLocaleString()} logged
+            Rs. {metrics.topCategoryValue.toLocaleString()} · {metrics.totalOutflows > 0 ? Math.round((metrics.topCategoryValue / metrics.totalOutflows) * 100) : 0}% of outflows
           </div>
         </div>
 
         {/* Runway Forecast */}
         <div className="report-metric-card">
-          <div className="report-metric-title">Predicted Runway</div>
-          <div className="report-metric-val" style={{ color: metrics.runwayDays === 'infinite' ? 'var(--emerald-gains)' : 'var(--ink-color)' }}>
-            {metrics.runwayDays === 'infinite' ? '∞ Days' : `${metrics.runwayDays} Days`}
+          <div className="report-metric-title">Cash Runway</div>
+          <div className="report-metric-val" style={{ color: metrics.runwayDays === 'infinite' ? 'var(--emerald-gains)' : typeof metrics.runwayDays === 'number' && metrics.runwayDays < 30 ? 'var(--coral-losses)' : 'var(--ink-color)' }}>
+            {metrics.runwayDays === 'infinite' ? '∞ Days' : `${metrics.runwayDays}d`}
           </div>
           <div className="report-metric-sub">
-            {metrics.runwayDays === 'infinite' ? 'Balanced / Net Inflow' : 'Before cash depletion'}
+            {metrics.runwayDays === 'infinite' ? 'Net positive cash flow' : 'Before cash depletion'}
+          </div>
+        </div>
+
+        {/* Daily Burn */}
+        <div className="report-metric-card">
+          <div className="report-metric-title">Daily Burn Rate</div>
+          <div className="report-metric-val">
+            Rs. {Math.round(metrics.dailyBurnRate).toLocaleString()}
+          </div>
+          <div className="report-metric-sub">
+            Avg over {metrics.days} days
           </div>
         </div>
       </div>
@@ -443,8 +465,9 @@ export const Reports: React.FC<ReportsProps> = ({
         </div>
 
         {trendData.length < 2 ? (
-          <div className="flex flex-col align-center justify-center" style={{ padding: 'var(--space-12) 0', color: 'var(--ink-light)' }}>
-            Not enough data points in this period to display a trend.
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '3rem 0', gap: '8px', color: 'var(--ink-light)' }}>
+            <span style={{ fontSize: '1.5rem' }}>📈</span>
+            <span style={{ fontSize: '0.9rem' }}>Not enough data in this period to display a trend.</span>
           </div>
         ) : (
           <div style={{ position: 'relative', width: '100%', height: '150px', marginTop: 'var(--space-4)' }}>
@@ -566,8 +589,9 @@ export const Reports: React.FC<ReportsProps> = ({
             </p>
 
             {breakdownSegments.length === 0 ? (
-              <div className="flex flex-col align-center justify-center" style={{ padding: 'var(--space-12) 0', color: 'var(--ink-light)' }}>
-                No expense distribution data available.
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '3rem 0', gap: '8px', color: 'var(--ink-light)' }}>
+                <span style={{ fontSize: '1.5rem' }}>🍧</span>
+                <span style={{ fontSize: '0.9rem' }}>No expense data in this period.</span>
               </div>
             ) : (
               <div className="flex gap-6 align-center flex-wrap" style={{ marginTop: 'var(--space-6)', justifyContent: 'space-around' }}>
@@ -661,7 +685,7 @@ export const Reports: React.FC<ReportsProps> = ({
                         style={{
                           display: 'flex',
                           alignItems: 'center',
-                          justifyContent: 'between',
+                          justifyContent: 'space-between',
                           padding: '4px 8px',
                           borderRadius: 'var(--radius-sm)',
                           backgroundColor: isHovered ? 'rgba(128,128,128,0.05)' : 'transparent',
@@ -749,8 +773,9 @@ export const Reports: React.FC<ReportsProps> = ({
         </div>
 
         {searchedAndSortedTransactions.length === 0 ? (
-          <div className="flex flex-col align-center justify-center" style={{ padding: 'var(--space-12) 0', color: 'var(--ink-light)', gap: 'var(--space-2)' }}>
-            <p style={{ fontSize: '0.9rem' }}>No ledger entries found matching criteria.</p>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '3rem 0', gap: '8px', color: 'var(--ink-light)' }}>
+            <span style={{ fontSize: '1.5rem' }}>🔍</span>
+            <span style={{ fontSize: '0.9rem' }}>{searchTerm ? `No entries matching “${searchTerm}”` : 'No transactions logged for this period.'}</span>
           </div>
         ) : (
           <div style={{ overflowX: 'auto' }}>

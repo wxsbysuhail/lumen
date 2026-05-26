@@ -156,384 +156,244 @@ export const SavingsTracker: React.FC<SavingsTrackerProps> = ({
   const radius = 32;
   const circumference = 2 * Math.PI * radius;
 
+  // ── Shared modal style constants ────────────────────────────────────────────
+  const BACKDROP: React.CSSProperties = {
+    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+    background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
+    display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '1rem',
+  };
+  const MODAL_PANEL: React.CSSProperties = {
+    background: 'var(--card-bg)', border: '1px solid var(--border-color)',
+    borderRadius: '1.5rem', padding: '1.5rem', width: '100%', maxWidth: '460px',
+    overflowY: 'auto', maxHeight: '90vh', position: 'relative', zIndex: 1001,
+  };
+  const PRIORITY_COLORS: Record<string, { color: string; bg: string }> = {
+    low:    { color: 'var(--emerald-gains)', bg: 'var(--emerald-gains-bg)' },
+    medium: { color: '#B45309',             bg: 'rgba(228,168,59,0.1)' },
+    high:   { color: 'var(--coral-losses)', bg: 'var(--coral-losses-bg)' },
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 15 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -15 }}
       transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-      className="flex flex-col gap-8"
+      style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}
     >
-      <div className="flex justify-between align-start gap-4">
-        <div className="flex flex-col gap-2" style={{ flex: 1 }}>
-          <h1 className="serif-title" style={{ fontSize: '2.5rem', fontWeight: 400, fontStyle: 'italic', lineHeight: 1.1, marginBottom: '4px' }}>Savings Targets</h1>
-          <p style={{ color: 'var(--ink-muted)' }}>
-            Allocate funds to separate goal buckets. Monitor progress rings and timelines.
+      {/* Page header */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1 }}>
+          <h1 style={{ fontFamily: 'var(--font-sans)', fontSize: '1.75rem', fontWeight: 700, letterSpacing: '-0.03em', color: 'var(--ink-color)', margin: 0 }}>Savings Targets</h1>
+          <p style={{ color: 'var(--ink-light)', fontSize: '0.85rem', lineHeight: '1.5', margin: 0 }}>
+            Allocate cash to goal buckets. Track progress rings and completion timelines.
           </p>
         </div>
-        <button className="btn btn-primary" style={{ flexShrink: 0, marginTop: '4px', whiteSpace: 'nowrap' }} onClick={() => setShowAddForm(true)}>
-          <Plus size={16} /> New Bucket
+        <button
+          className="btn btn-primary"
+          style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}
+          onClick={() => setShowAddForm(true)}
+        >
+          <Plus size={15} /> New Bucket
         </button>
       </div>
 
-      {/* General Balance Bar */}
-      <div className="card flex justify-between align-center" style={{ backgroundColor: 'var(--card-bg)' }}>
+      {/* Available Balance Card */}
+      <div className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
         <div>
-          <span style={{ fontSize: '0.8rem', color: 'var(--ink-muted)', fontWeight: 600 }}>AVAILABLE GENERAL CASH BALANCE</span>
-          <h2 className="num" style={{ fontSize: '1.8rem', fontWeight: 550, marginTop: '2px' }}>
+          <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--ink-light)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Available Cash Balance</span>
+          <h2 className="num" style={{ fontSize: '2rem', fontWeight: 700, letterSpacing: '-0.04em', color: 'var(--ink-color)', marginTop: '2px', marginBottom: 0 }}>
             Rs. {generalBalance.toLocaleString('en-US')}
           </h2>
         </div>
-        <div style={{ color: 'var(--ink-light)', fontSize: '0.85rem' }}>
-          Move general cash into goals below to reserve funds.
-        </div>
+        <p style={{ color: 'var(--ink-light)', fontSize: '0.82rem', margin: 0 }}>
+          Transfer into buckets below to reserve funds toward each goal.
+        </p>
       </div>
 
       {/* Grid of Buckets */}
-      <div className="grid grid-2 gap-6">
-        {buckets.map((bucket) => {
-          const pct = Math.min(100, Math.max(0, (bucket.current / bucket.target) * 100));
-          const strokeDashoffset = circumference - (pct / 100) * circumference;
-          
-          return (
-            <div key={bucket.id} className="card flex flex-col justify-between" style={{ minHeight: '275px' }}>
-              <div>
-                <div className="flex justify-between align-start" style={{ marginBottom: 'var(--space-4)' }}>
-                  <div>
-                    <div className="flex align-center gap-2" style={{ flexWrap: 'wrap' }}>
-                      <h3 style={{ fontSize: '1.2rem', fontWeight: 650, marginBottom: '2px' }}>{bucket.name}</h3>
-                      <button
-                        type="button"
-                        className="icon-btn"
-                        onClick={() => {
-                          setEditingBucket(bucket);
-                          setEditName(bucket.name);
-                          setEditTarget(bucket.target.toLocaleString('en-US'));
-                          setEditMonthly(bucket.monthlyContribution.toLocaleString('en-US'));
-                          setEditPriority(bucket.priority || 'medium');
-                          setShowDeleteConfirm(false);
-                        }}
-                        title="Edit Goal"
-                      >
-                        <Edit2 size={14} />
-                      </button>
+      {buckets.length === 0 ? (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '4rem 1rem', gap: '12px', textAlign: 'center' }}>
+          <div style={{ fontSize: '2.5rem', lineHeight: 1 }}>🪣</div>
+          <p style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--ink-color)', margin: 0 }}>No savings buckets yet</p>
+          <p style={{ fontSize: '0.85rem', color: 'var(--ink-muted)', margin: 0 }}>Create a bucket to start allocating cash toward your goals.</p>
+          <button
+            className="btn btn-primary"
+            style={{ marginTop: '8px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+            onClick={() => setShowAddForm(true)}
+          >
+            <Plus size={15} /> Create First Bucket
+          </button>
+        </div>
+      ) : (
+        <div className="grid grid-2 gap-6">
+          {buckets.map((bucket) => {
+            const pct = Math.min(100, Math.max(0, (bucket.current / bucket.target) * 100));
+            const strokeDashoffset = circumference - (pct / 100) * circumference;
+            const ringColor = pct >= 100 ? 'var(--emerald-gains)' : pct >= 60 ? 'var(--emerald-gains)' : pct >= 25 ? '#E2A83B' : 'var(--coral-losses)';
+            const priorityStyle = bucket.priority ? PRIORITY_COLORS[bucket.priority] : PRIORITY_COLORS.medium;
+
+            return (
+              <div key={bucket.id} className="card flex flex-col justify-between" style={{ minHeight: '275px' }}>
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 'var(--space-4)' }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                        <h3 style={{ fontSize: '1.1rem', fontWeight: 650, marginBottom: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{bucket.name}</h3>
+                        <button type="button" className="icon-btn" title="Edit Goal"
+                          onClick={() => { setEditingBucket(bucket); setEditName(bucket.name); setEditTarget(bucket.target.toLocaleString('en-US')); setEditMonthly(bucket.monthlyContribution.toLocaleString('en-US')); setEditPriority(bucket.priority || 'medium'); setShowDeleteConfirm(false); }}>
+                          <Edit2 size={14} />
+                        </button>
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', marginTop: '6px' }}>
+                        {bucket.priority && (
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '2px 7px', borderRadius: '999px', fontSize: '0.68rem', fontWeight: 700, background: priorityStyle.bg, color: priorityStyle.color, width: 'fit-content' }}>
+                            <span style={{ width: '4px', height: '4px', borderRadius: '50%', background: priorityStyle.color, flexShrink: 0 }} />
+                            {bucket.priority.toUpperCase()} PRIORITY
+                          </div>
+                        )}
+                        <span className="num" style={{ fontSize: '0.75rem', color: 'var(--ink-light)' }}>
+                          {calculateProjection(bucket.current, bucket.target, bucket.monthlyContribution)}
+                        </span>
+                      </div>
                     </div>
-                    <div className="flex flex-col gap-1" style={{ marginTop: '2px' }}>
-                      {bucket.priority && (
-                        <div style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '4px',
-                          padding: '2px 6px',
-                          borderRadius: '12px',
-                          fontSize: '0.7rem',
-                          fontWeight: 600,
-                          backgroundColor: bucket.priority === 'high' ? 'rgba(232, 93, 93, 0.06)' : bucket.priority === 'medium' ? 'rgba(245, 158, 11, 0.06)' : 'rgba(10, 10, 10, 0.04)',
-                          color: bucket.priority === 'high' ? 'var(--coral-losses)' : bucket.priority === 'medium' ? '#B45309' : 'var(--ink-muted)',
-                          width: 'fit-content',
-                        }}>
-                          <span style={{
-                            width: '4px',
-                            height: '4px',
-                            borderRadius: '50%',
-                            backgroundColor: bucket.priority === 'high' ? 'var(--coral-losses)' : bucket.priority === 'medium' ? '#F59E0B' : 'var(--ink-muted)',
-                          }} />
-                          {bucket.priority.toUpperCase()} PRIORITY
-                        </div>
-                      )}
-                      <span className="num" style={{ fontSize: '0.78rem', color: 'var(--ink-light)' }}>
-                        {calculateProjection(bucket.current, bucket.target, bucket.monthlyContribution)}
-                      </span>
+
+                    {/* SVG progress ring — starts at 12 o'clock */}
+                    <div style={{ position: 'relative', width: '76px', height: '76px', flexShrink: 0 }}>
+                      <svg width="76" height="76" viewBox="0 0 80 80" style={{ transform: 'rotate(-90deg)' }}>
+                        <circle cx="40" cy="40" r={radius} fill="transparent" stroke="var(--border-color)" strokeWidth="8" />
+                        <circle cx="40" cy="40" r={radius} fill="transparent" stroke={ringColor} strokeWidth="8"
+                          strokeDasharray={circumference} strokeDashoffset={strokeDashoffset} strokeLinecap="round"
+                          style={{ transition: 'stroke-dashoffset 0.8s ease, stroke 0.4s ease' }}
+                        />
+                      </svg>
+                      <div className="num" style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', fontSize: '0.82rem', fontWeight: 700, color: ringColor }}>
+                        {Math.round(pct)}%
+                      </div>
                     </div>
                   </div>
-                  
-                  {/* SVG progress ring */}
-                  <div style={{ position: 'relative', width: '80px', height: '80px' }}>
-                    <svg width="80" height="80" viewBox="0 0 80 80">
-                      <circle
-                        cx="40"
-                        cy="40"
-                        r={radius}
-                        fill="transparent"
-                        stroke="var(--border-color)"
-                        strokeWidth="4"
-                      />
-                      <circle
-                        cx="40"
-                        cy="40"
-                        r={radius}
-                        fill="transparent"
-                        stroke="var(--emerald-gains)"
-                        strokeWidth="4"
-                        strokeDasharray={circumference}
-                        strokeDashoffset={strokeDashoffset}
-                        strokeLinecap="round"
-                        className="progress-ring-circle"
-                      />
-                    </svg>
-                    <div className="num" style={{
-                      position: 'absolute',
-                      top: '50%',
-                      left: '50%',
-                      transform: 'translate(-50%, -50%)',
-                      fontSize: '0.85rem',
-                      fontWeight: 650,
-                    }}>
-                      {Math.round(pct)}%
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', marginTop: 'var(--space-2)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem' }}>
+                      <span style={{ color: 'var(--ink-muted)' }}>Accumulated</span>
+                      <span className="num" style={{ fontWeight: 600 }}>Rs. {bucket.current.toLocaleString()}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem' }}>
+                      <span style={{ color: 'var(--ink-muted)' }}>Target Goal</span>
+                      <span className="num" style={{ fontWeight: 600 }}>Rs. {bucket.target.toLocaleString()}</span>
+                    </div>
+                    {/* Linear progress bar */}
+                    <div style={{ height: '4px', background: 'var(--border-color)', borderRadius: '2px', overflow: 'hidden', margin: '2px 0' }}>
+                      <div style={{ height: '100%', width: `${pct}%`, background: ringColor, borderRadius: '2px', transition: 'width 0.8s ease' }} />
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem' }}>
+                      <span style={{ color: 'var(--ink-muted)' }}>Monthly Share</span>
+                      <span className="num" style={{ fontWeight: 600 }}>Rs. {bucket.monthlyContribution.toLocaleString()} / mo</span>
                     </div>
                   </div>
                 </div>
 
-                <div className="flex flex-col gap-1" style={{ marginTop: 'var(--space-2)' }}>
-                  <div className="flex justify-between" style={{ fontSize: '0.85rem' }}>
-                    <span style={{ color: 'var(--ink-muted)' }}>Accumulated</span>
-                    <span className="num" style={{ fontWeight: 600 }}>Rs. {bucket.current.toLocaleString()}</span>
-                  </div>
-                  <div className="flex justify-between" style={{ fontSize: '0.85rem' }}>
-                    <span style={{ color: 'var(--ink-muted)' }}>Target Goal</span>
-                    <span className="num" style={{ fontWeight: 600 }}>Rs. {bucket.target.toLocaleString()}</span>
-                  </div>
-                  <div className="flex justify-between" style={{ fontSize: '0.85rem' }}>
-                    <span style={{ color: 'var(--ink-muted)' }}>Monthly Share</span>
-                    <span className="num" style={{ fontWeight: 600 }}>Rs. {bucket.monthlyContribution.toLocaleString()} / mo</span>
-                  </div>
+                <div style={{ marginTop: 'var(--space-4)' }}>
+                  {bucket.current >= bucket.target ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--emerald-gains)', fontSize: '0.9rem', fontWeight: 600 }}>
+                      <CheckCircle2 size={16} /> Goal Completed
+                    </div>
+                  ) : (
+                    <button className="btn btn-secondary" style={{ width: '100%', fontSize: '0.85rem' }}
+                      onClick={() => { setDepositBucketId(bucket.id); setDepositAmount(''); setDepositError(''); }}>
+                      Transfer Cash
+                    </button>
+                  )}
                 </div>
               </div>
-
-              <div className="flex gap-2" style={{ marginTop: 'var(--space-4)' }}>
-                {bucket.current >= bucket.target ? (
-                  <div className="flex align-center gap-1 text-gain" style={{ fontSize: '0.9rem', fontWeight: 600 }}>
-                    <CheckCircle2 size={16} /> Goal Completed
-                  </div>
-                ) : (
-                  <button
-                    className="btn btn-secondary"
-                    style={{ flex: 1, padding: '8px 0', fontSize: '0.85rem' }}
-                    onClick={() => {
-                      setDepositBucketId(bucket.id);
-                      setDepositAmount('');
-                      setDepositError('');
-                    }}
-                  >
-                    Transfer Cash
-                  </button>
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* Add Bucket Modal */}
       {showAddForm && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(10, 10, 10, 0.45)',
-          backdropFilter: 'blur(8px)',
-          WebkitBackdropFilter: 'blur(8px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 2000,
-          padding: '16px',
-        }}>
-          {/* Backdrop click handler to close */}
-          <div 
-            style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, cursor: 'pointer' }}
-            onClick={() => setShowAddForm(false)}
-          />
-
+        <div style={BACKDROP}>
+          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} onClick={() => setShowAddForm(false)} />
           <motion.div
-            initial={{ opacity: 0, scale: 0.94, y: 8 }}
+            initial={{ opacity: 0, scale: 0.95, y: 8 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.94, y: 8 }}
-            transition={{ type: 'tween', ease: [0.16, 1, 0.3, 1], duration: 0.28 }}
-            className="card"
-            style={{
-              width: '100%',
-              maxWidth: '480px',
-              maxHeight: 'calc(100vh - 40px)',
-              backgroundColor: 'var(--card-bg)',
-              borderRadius: '24px',
-              border: '1px solid var(--border-color)',
-              boxShadow: '0 4px 6px rgba(0,0,0,0.04), 0 24px 64px rgba(0,0,0,0.18)',
-              padding: '28px',
-              display: 'flex',
-              flexDirection: 'column',
-              zIndex: 2001,
-              position: 'relative',
-              overflowY: 'auto'
-            }}
+            exit={{ opacity: 0, scale: 0.95, y: 8 }}
+            transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+            style={MODAL_PANEL}
           >
-            <div className="flex justify-between align-center" style={{ marginBottom: '24px' }}>
-              <h3 className="serif-title" style={{ fontSize: '1.8rem', margin: 0 }}>Create Savings Bucket</h3>
-              <button 
-                type="button" 
-                className="btn btn-secondary" 
-                style={{ padding: 0, borderRadius: '50%', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center' }} 
-                onClick={() => setShowAddForm(false)}
-              >
-                <X size={16} />
-              </button>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+              <h3 style={{ fontFamily: 'var(--font-sans)', fontSize: '1.35rem', fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--ink-color)', margin: 0 }}>New Savings Bucket</h3>
+              <button type="button" className="icon-btn" onClick={() => setShowAddForm(false)}><X size={16} /></button>
             </div>
 
-            <form onSubmit={handleCreate} className="flex flex-col gap-4">
+            <form onSubmit={handleCreate} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <div className="input-group">
                 <label className="input-label">Bucket Label</label>
-                <input
-                  type="text"
-                  placeholder="e.g. Emergency Fund, Japan Trip"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="input-field"
-                  required
-                />
+                <input type="text" placeholder="e.g. Emergency Fund, Japan Trip" value={name} onChange={(e) => setName(e.target.value)} className="input-field" required autoFocus />
               </div>
 
               <div className="input-group">
                 <label className="input-label">Target Amount (MUR)</label>
-                <input
-                  type="text"
-                  placeholder="e.g. 100,000"
-                  value={target}
-                  onChange={(e) => handleCurrencyChange(e.target.value, setTarget)}
-                  className="input-field num-input"
-                  required
-                />
+                <input type="text" placeholder="e.g. 100,000" value={target} onChange={(e) => handleCurrencyChange(e.target.value, setTarget)} className="input-field num-input" required />
               </div>
 
               <div className="input-group">
-                <label className="input-label">Goal Importance / Priority</label>
-                <div className="flex gap-2" style={{ marginTop: '4px' }}>
+                <label className="input-label">Goal Priority</label>
+                <div style={{ display: 'flex', background: 'var(--nav-pill-bg)', padding: '3px', borderRadius: '9999px', gap: '3px' }}>
                   {(['low', 'medium', 'high'] as const).map((p) => {
-                    const label = p.charAt(0).toUpperCase() + p.slice(1);
                     const isActive = priority === p;
-                    const activeBg = p === 'high' ? 'rgba(232, 93, 93, 0.08)' : p === 'medium' ? 'rgba(245, 158, 11, 0.08)' : 'rgba(10, 10, 10, 0.04)';
-                    const activeBorder = p === 'high' ? 'var(--coral-losses)' : p === 'medium' ? 'var(--amber-warning)' : 'var(--border-color)';
-                    const activeColor = p === 'high' ? 'var(--coral-losses)' : p === 'medium' ? '#B45309' : 'var(--ink-color)';
-                    const dotColor = p === 'high' ? 'var(--coral-losses)' : p === 'medium' ? '#F59E0B' : 'var(--ink-muted)';
-                    
                     return (
-                      <button
-                        key={p}
-                        type="button"
-                        onClick={() => setPriority(p)}
-                        style={{
-                          flex: 1,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '6px',
-                          padding: '10px 12px',
-                          borderRadius: 'var(--radius-md)',
-                          fontSize: '0.85rem',
-                          fontWeight: 600,
-                          cursor: 'pointer',
-                          transition: 'all 0.2s ease',
-                          backgroundColor: isActive ? activeBg : 'rgba(10, 10, 10, 0.01)',
-                          border: `1px solid ${isActive ? activeBorder : 'var(--border-color)'}`,
-                          color: isActive ? activeColor : 'var(--ink-muted)',
-                        }}
-                      >
-                        <span style={{
-                          width: '6px',
-                          height: '6px',
-                          borderRadius: '50%',
-                          backgroundColor: dotColor,
-                        }} />
-                        {label}
+                      <button key={p} type="button" onClick={() => setPriority(p)}
+                        style={{ flex: 1, padding: '8px 0', borderRadius: '9999px', fontSize: '0.82rem', fontWeight: isActive ? 650 : 500, border: 'none', cursor: 'pointer', transition: 'all 0.2s', background: isActive ? PRIORITY_COLORS[p].bg : 'transparent', color: isActive ? PRIORITY_COLORS[p].color : 'var(--ink-muted)', boxShadow: isActive ? '0 1px 3px rgba(0,0,0,0.08)' : 'none' }}>
+                        {p.charAt(0).toUpperCase() + p.slice(1)}
                       </button>
                     );
                   })}
                 </div>
               </div>
 
-              {/* Auto-Allocation Recommendation panel */}
+              {/* Auto-Allocation Advisor */}
               {(() => {
                 const otherContributions = getOtherBucketsContributionSum();
                 const remaining = Math.max(0, coreDisposable - otherContributions);
                 let suggestedMax = getSuggestedMax(priority, remaining);
-
-                // Cap the suggested maximum by the target amount to avoid over-allocating beyond the goal size
                 const targetVal = parseFloat(target.replace(/,/g, '')) || 0;
-                if (targetVal > 0 && suggestedMax > targetVal) {
-                  suggestedMax = targetVal;
-                }
-
+                if (targetVal > 0 && suggestedMax > targetVal) suggestedMax = targetVal;
                 const currentMonthlyInput = parseFloat(monthly.replace(/,/g, '')) || 0;
                 const isExceeded = currentMonthlyInput > suggestedMax;
-                
                 return (
-                  <div className="card" style={{
-                    backgroundColor: 'rgba(10, 10, 10, 0.02)',
-                    border: '1px dashed var(--border-color)',
-                    padding: '12px var(--space-3)',
-                    borderRadius: 'var(--radius-md)',
-                    fontSize: '0.82rem',
-                    color: 'var(--ink-color)',
-                  }}>
-                    <div className="flex justify-between align-center" style={{ marginBottom: '8px' }}>
-                      <strong style={{ fontWeight: 650, color: 'var(--ink-muted)' }}>Auto-Allocation Advisor</strong>
-                      <button
-                        type="button"
-                        style={{
-                          fontSize: '0.78rem',
-                          background: 'none',
-                          border: 'none',
-                          color: 'var(--emerald-gains)',
-                          textDecoration: 'underline',
-                          cursor: suggestedMax > 0 ? 'pointer' : 'default',
-                          opacity: suggestedMax > 0 ? 1 : 0.5,
-                          padding: 0,
-                          fontWeight: 600,
-                        }}
-                        onClick={() => setMonthly(suggestedMax.toLocaleString('en-US'))}
-                        disabled={suggestedMax <= 0}
-                      >
+                  <div style={{ background: 'var(--nav-pill-bg)', border: '1px solid var(--border-color)', borderRadius: '1rem', padding: '1rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                      <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--ink-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Auto-Allocation Advisor</span>
+                      <button type="button" style={{ fontSize: '0.75rem', color: 'var(--emerald-gains)', fontWeight: 650, background: 'none', border: 'none', cursor: 'pointer' }}
+                        onClick={() => setMonthly(suggestedMax.toLocaleString('en-US'))} disabled={suggestedMax <= 0}>
                         Apply Max (Rs. {suggestedMax.toLocaleString()})
                       </button>
                     </div>
-                    
-                    <div className="flex flex-col gap-1" style={{ color: 'var(--ink-muted)', fontSize: '0.78rem' }}>
-                      <div className="flex justify-between">
-                        <span>Baseline:</span>
-                        <span className="num">Rs. {baseSalary.toLocaleString()} (Salary) - Rs. {leaseExpense.toLocaleString()} (Lease) = Rs. {coreDisposable.toLocaleString()}</span>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', fontSize: '0.78rem' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span style={{ color: 'var(--ink-muted)' }}>Baseline:</span>
+                        <span className="num" style={{ color: 'var(--ink-color)' }}>Rs. {baseSalary.toLocaleString()} − Rs. {leaseExpense.toLocaleString()} = Rs. {coreDisposable.toLocaleString()}</span>
                       </div>
                       {otherContributions > 0 && (
-                        <div className="flex justify-between">
-                          <span>Other Buckets:</span>
-                          <span className="num" style={{ color: 'var(--coral-losses)' }}>- Rs. {otherContributions.toLocaleString()} / mo</span>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <span style={{ color: 'var(--ink-muted)' }}>Other buckets:</span>
+                          <span className="num" style={{ color: 'var(--coral-losses)' }}>−Rs. {otherContributions.toLocaleString()} / mo</span>
                         </div>
                       )}
-                      <div className="flex justify-between" style={{ borderTop: '1px solid var(--border-color)', paddingTop: '4px', marginTop: '2px', fontWeight: 600 }}>
-                        <span>Remaining Pool:</span>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '5px', borderTop: '1px solid var(--border-color)', fontWeight: 600 }}>
+                        <span style={{ color: 'var(--ink-color)' }}>Remaining Pool:</span>
                         <span className="num" style={{ color: 'var(--ink-color)' }}>Rs. {remaining.toLocaleString()}</span>
                       </div>
-                      <div className="flex justify-between" style={{ marginTop: '2px' }}>
-                        <span>Suggested ({priority === 'high' ? '70%' : priority === 'medium' ? '35%' : '15%'}):</span>
-                        <span className="num" style={{ fontWeight: 650, color: 'var(--emerald-gains)' }}>Rs. {suggestedMax.toLocaleString()} / mo</span>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span style={{ color: 'var(--ink-muted)' }}>Suggested ({priority === 'high' ? '70%' : priority === 'medium' ? '35%' : '15%'}):</span>
+                        <span className="num" style={{ color: 'var(--emerald-gains)', fontWeight: 650 }}>Rs. {suggestedMax.toLocaleString()} / mo</span>
                       </div>
                     </div>
-
                     {isExceeded && (
-                      <div style={{
-                        backgroundColor: 'rgba(245, 158, 11, 0.05)',
-                        border: '1px solid rgba(245, 158, 11, 0.15)',
-                        padding: '6px 10px',
-                        borderRadius: 'var(--radius-sm)',
-                        color: '#B45309',
-                        fontSize: '0.78rem',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        marginTop: '10px',
-                      }}>
-                        <AlertCircle size={12} style={{ flexShrink: 0 }} />
-                        <span>Warning: Exceeds safe suggested monthly maximum.</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '10px', padding: '8px 10px', background: 'rgba(228,168,59,0.08)', border: '1px solid rgba(228,168,59,0.25)', borderRadius: '8px', fontSize: '0.75rem', color: '#B45309' }}>
+                        <AlertCircle size={12} style={{ flexShrink: 0 }} /><span>Exceeds safe suggested monthly maximum.</span>
                       </div>
                     )}
                   </div>
@@ -541,23 +401,13 @@ export const SavingsTracker: React.FC<SavingsTrackerProps> = ({
               })()}
 
               <div className="input-group">
-                <label className="input-label">Monthly Target Contribution (MUR)</label>
-                <input
-                  type="text"
-                  placeholder="e.g. 5,000"
-                  value={monthly}
-                  onChange={(e) => handleCurrencyChange(e.target.value, setMonthly)}
-                  className="input-field num-input"
-                />
+                <label className="input-label">Monthly Contribution (MUR)</label>
+                <input type="text" placeholder="e.g. 5,000" value={monthly} onChange={(e) => handleCurrencyChange(e.target.value, setMonthly)} className="input-field num-input" />
               </div>
 
-              <div className="flex justify-between" style={{ marginTop: 'var(--space-4)' }}>
-                <button type="button" className="btn btn-secondary" onClick={() => setShowAddForm(false)}>
-                  Cancel
-                </button>
-                <button type="submit" className="btn btn-primary">
-                  Create Bucket
-                </button>
+              <div style={{ display: 'flex', gap: '8px', marginTop: '0.5rem' }}>
+                <button type="button" className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setShowAddForm(false)}>Cancel</button>
+                <button type="submit" className="btn btn-primary" style={{ flex: 2 }}>Create Bucket</button>
               </div>
             </form>
           </motion.div>
@@ -565,361 +415,171 @@ export const SavingsTracker: React.FC<SavingsTrackerProps> = ({
       )}
 
       {/* Deposit to Bucket Modal */}
-      {depositBucketId && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(10, 10, 10, 0.45)',
-          backdropFilter: 'blur(8px)',
-          WebkitBackdropFilter: 'blur(8px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 2000,
-          padding: '16px',
-        }}>
-          {/* Backdrop click handler to close */}
-          <div 
-            style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, cursor: 'pointer' }}
-            onClick={() => setDepositBucketId(null)}
-          />
-
-          <motion.div
-            initial={{ opacity: 0, scale: 0.94, y: 8 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.94, y: 8 }}
-            transition={{ type: 'tween', ease: [0.16, 1, 0.3, 1], duration: 0.28 }}
-            className="card"
-            style={{
-              width: '100%',
-              maxWidth: '420px',
-              maxHeight: 'calc(100vh - 40px)',
-              backgroundColor: 'var(--card-bg)',
-              borderRadius: '24px',
-              border: '1px solid var(--border-color)',
-              boxShadow: '0 4px 6px rgba(0,0,0,0.04), 0 24px 64px rgba(0,0,0,0.18)',
-              padding: '28px',
-              display: 'flex',
-              flexDirection: 'column',
-              zIndex: 2001,
-              position: 'relative',
-              overflowY: 'auto'
-            }}
-          >
-            <div className="flex justify-between align-center" style={{ marginBottom: '16px' }}>
-              <h3 className="serif-title" style={{ fontSize: '1.8rem', margin: 0 }}>Transfer Cash to Bucket</h3>
-              <button 
-                type="button" 
-                className="btn btn-secondary" 
-                style={{ padding: 0, borderRadius: '50%', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center' }} 
-                onClick={() => setDepositBucketId(null)}
-              >
-                <X size={16} />
-              </button>
-            </div>
-
-            <p style={{ fontSize: '0.85rem', color: 'var(--ink-muted)', marginBottom: 'var(--space-4)' }}>
-              General cash will be deducted and allocated directly into this bucket.
-            </p>
-            
-            <form onSubmit={handleDepositSubmit} className="flex flex-col gap-4">
-              <div className="input-group">
-                <label className="input-label">Transfer Amount (MUR)</label>
-                <input
-                  type="text"
-                  placeholder="e.g. 10,000"
-                  value={depositAmount}
-                  onChange={(e) => {
-                    handleCurrencyChange(e.target.value, setDepositAmount);
-                    setDepositError('');
-                  }}
-                  className="input-field num-input"
-                  required
-                  autoFocus
-                />
-                <span className="num" style={{ fontSize: '0.78rem', color: 'var(--ink-light)', marginTop: '2px' }}>
-                  Available: Rs. {generalBalance.toLocaleString()}
-                </span>
+      {depositBucketId && (() => {
+        const depositBucket = buckets.find(b => b.id === depositBucketId);
+        const depositAmt = parseFloat(depositAmount.replace(/,/g, '')) || 0;
+        return (
+          <div style={BACKDROP}>
+            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} onClick={() => setDepositBucketId(null)} />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 8 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 8 }}
+              transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+              style={MODAL_PANEL}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+                <h3 style={{ fontFamily: 'var(--font-sans)', fontSize: '1.35rem', fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--ink-color)', margin: 0 }}>Transfer Cash</h3>
+                <button type="button" className="icon-btn" onClick={() => setDepositBucketId(null)}><X size={16} /></button>
               </div>
 
-              {depositError && (
-                <div style={{
-                  backgroundColor: 'rgba(232, 93, 93, 0.05)',
-                  border: '1px solid rgba(232, 93, 93, 0.15)',
-                  padding: '10px var(--space-3)',
-                  borderRadius: 'var(--radius-md)',
-                  color: 'var(--coral-losses)',
-                  fontSize: '0.82rem',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  marginTop: '-4px',
-                }}>
-                  <AlertCircle size={14} />
-                  {depositError}
+              {depositBucket && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', background: 'var(--nav-pill-bg)', borderRadius: '10px', marginBottom: '1rem', border: '1px solid var(--border-color)' }}>
+                  <span style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--ink-color)' }}>{depositBucket.name}</span>
+                  <span className="num" style={{ fontSize: '0.8rem', color: 'var(--ink-muted)' }}>
+                    Rs. {depositBucket.current.toLocaleString()} / Rs. {depositBucket.target.toLocaleString()}
+                  </span>
                 </div>
               )}
 
-              <div className="flex justify-between" style={{ marginTop: 'var(--space-4)' }}>
-                <button type="button" className="btn btn-secondary" onClick={() => setDepositBucketId(null)}>
-                  Cancel
-                </button>
-                <button type="submit" className="btn btn-primary" disabled={!depositAmount || (parseFloat(depositAmount.replace(/,/g, '')) || 0) > generalBalance}>
-                  Confirm Transfer
-                </button>
-              </div>
-            </form>
-          </motion.div>
-        </div>
-      )}
+              <p style={{ fontSize: '0.85rem', color: 'var(--ink-muted)', marginBottom: '1rem' }}>
+                General cash will be deducted and deposited directly into this bucket.
+              </p>
+
+              <form onSubmit={handleDepositSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <div className="input-group">
+                  <label className="input-label">Transfer Amount (MUR)</label>
+                  <input type="text" placeholder="e.g. 10,000" value={depositAmount}
+                    onChange={(e) => { handleCurrencyChange(e.target.value, setDepositAmount); setDepositError(''); }}
+                    className="input-field num-input" required autoFocus />
+                  <span className="num" style={{ fontSize: '0.75rem', color: 'var(--ink-light)', marginTop: '4px', display: 'block' }}>
+                    Available: Rs. {generalBalance.toLocaleString('en-US')}
+                  </span>
+                </div>
+
+                {depositError && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 12px', background: 'var(--coral-losses-bg)', border: '1px solid var(--coral-losses)', borderRadius: '10px', fontSize: '0.82rem', color: 'var(--coral-losses)' }}>
+                    <AlertCircle size={14} style={{ flexShrink: 0 }} />{depositError}
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', gap: '8px', marginTop: '0.5rem' }}>
+                  <button type="button" className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setDepositBucketId(null)}>Cancel</button>
+                  <button type="submit" className="btn btn-primary" style={{ flex: 2 }} disabled={!depositAmount || depositAmt > generalBalance}>
+                    Confirm Transfer
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        );
+      })()}
 
       {/* Edit Bucket Modal */}
       {editingBucket && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(10, 10, 10, 0.45)',
-          backdropFilter: 'blur(8px)',
-          WebkitBackdropFilter: 'blur(8px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 2000,
-          padding: '16px',
-        }}>
-          {/* Backdrop click handler to close */}
-          <div 
-            style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, cursor: 'pointer' }}
-            onClick={() => setEditingBucket(null)}
-          />
-
+        <div style={BACKDROP}>
+          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} onClick={() => { setEditingBucket(null); setShowDeleteConfirm(false); }} />
           <motion.div
-            initial={{ opacity: 0, scale: 0.94, y: 8 }}
+            initial={{ opacity: 0, scale: 0.95, y: 8 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.94, y: 8 }}
-            transition={{ type: 'tween', ease: [0.16, 1, 0.3, 1], duration: 0.28 }}
-            className="card"
-            style={{
-              width: '100%',
-              maxWidth: '480px',
-              maxHeight: 'calc(100vh - 40px)',
-              backgroundColor: 'var(--card-bg)',
-              borderRadius: '24px',
-              border: '1px solid var(--border-color)',
-              boxShadow: '0 4px 6px rgba(0,0,0,0.04), 0 24px 64px rgba(0,0,0,0.18)',
-              padding: '28px',
-              display: 'flex',
-              flexDirection: 'column',
-              zIndex: 2001,
-              position: 'relative',
-              overflowY: 'auto'
-            }}
+            exit={{ opacity: 0, scale: 0.95, y: 8 }}
+            transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+            style={MODAL_PANEL}
           >
-            <div className="flex justify-between align-center" style={{ marginBottom: '24px' }}>
-              <h3 className="serif-title" style={{ fontSize: '1.8rem', margin: 0 }}>
-                {showDeleteConfirm ? 'Delete Goal Bucket' : 'Edit Savings Goal'}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+              <h3 style={{ fontFamily: 'var(--font-sans)', fontSize: '1.35rem', fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--ink-color)', margin: 0 }}>
+                {showDeleteConfirm ? 'Delete Bucket?' : 'Edit Savings Goal'}
               </h3>
-              <button 
-                type="button" 
-                className="btn btn-secondary" 
-                style={{ padding: 0, borderRadius: '50%', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center' }} 
-                onClick={() => setEditingBucket(null)}
-              >
-                <X size={16} />
-              </button>
+              <button type="button" className="icon-btn" onClick={() => { setEditingBucket(null); setShowDeleteConfirm(false); }}><X size={16} /></button>
             </div>
 
             {showDeleteConfirm ? (
-              <div className="flex flex-col gap-4">
-                <p style={{ fontSize: '0.9rem', color: 'var(--ink-color)', lineHeight: 1.4 }}>
-                  Are you sure you want to delete the goal bucket <strong>"{editingBucket.name}"</strong>?
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <p style={{ fontSize: '0.9rem', color: 'var(--ink-color)', lineHeight: 1.5 }}>
+                  Delete <strong>"{editingBucket.name}"</strong>? This cannot be undone.
                 </p>
-                <div style={{
-                  backgroundColor: 'rgba(232, 93, 93, 0.04)',
-                  border: '1px dashed var(--border-color)',
-                  padding: 'var(--space-3)',
-                  borderRadius: 'var(--radius-md)',
-                  fontSize: '0.85rem',
-                  lineHeight: 1.4,
-                  color: 'var(--ink-color)',
-                }}>
-                  <strong style={{ color: 'var(--coral-losses)' }}>Refund Policy:</strong> Accumulated savings of <span className="num" style={{ fontWeight: 650 }}>Rs. {editingBucket.current.toLocaleString()}</span> will be returned directly back into your General Cash Balance.
+                <div style={{ background: 'var(--coral-losses-bg)', border: '1px solid var(--coral-losses)', padding: '14px', borderRadius: '12px', fontSize: '0.85rem', lineHeight: 1.5, color: 'var(--ink-color)' }}>
+                  <strong style={{ color: 'var(--coral-losses)' }}>Refund: </strong>
+                  Accumulated savings of <span className="num" style={{ fontWeight: 700 }}>Rs. {editingBucket.current.toLocaleString()}</span> will be returned to your General Cash Balance.
                 </div>
-                <div className="flex justify-between gap-3" style={{ marginTop: 'var(--space-4)' }}>
-                  <button type="button" className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setShowDeleteConfirm(false)}>
-                    Cancel
-                  </button>
-                  <button type="button" className="btn btn-primary" style={{ flex: 1.5, backgroundColor: 'var(--coral-losses)', color: '#FFFFFF', border: 'none' }} onClick={handleDeleteSubmit}>
+                <div style={{ display: 'flex', gap: '8px', marginTop: '0.5rem' }}>
+                  <button type="button" className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setShowDeleteConfirm(false)}>Cancel</button>
+                  <button type="button" style={{ flex: 2, background: 'var(--coral-losses)', color: '#fff', border: 'none', borderRadius: '9999px', padding: '12px', fontSize: '0.9rem', fontWeight: 600, cursor: 'pointer' }} onClick={handleDeleteSubmit}>
                     Confirm Delete
                   </button>
                 </div>
               </div>
             ) : (
-              <form onSubmit={handleEditSubmit} className="flex flex-col gap-4">
-
-                
+              <form onSubmit={handleEditSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                 <div className="input-group">
                   <label className="input-label">Bucket Label</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Emergency Fund"
-                    value={editName}
-                    onChange={(e) => setEditName(e.target.value)}
-                    className="input-field"
-                    required
-                  />
+                  <input type="text" placeholder="e.g. Emergency Fund" value={editName} onChange={(e) => setEditName(e.target.value)} className="input-field" required autoFocus />
                 </div>
 
                 <div className="input-group">
                   <label className="input-label">Target Amount (MUR)</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. 100,000"
-                    value={editTarget}
-                    onChange={(e) => handleCurrencyChange(e.target.value, setEditTarget)}
-                    className="input-field num-input"
-                    required
-                  />
+                  <input type="text" placeholder="e.g. 100,000" value={editTarget} onChange={(e) => handleCurrencyChange(e.target.value, setEditTarget)} className="input-field num-input" required />
                 </div>
 
                 <div className="input-group">
-                  <label className="input-label">Goal Importance / Priority</label>
-                  <div className="flex gap-2" style={{ marginTop: '4px' }}>
+                  <label className="input-label">Goal Priority</label>
+                  <div style={{ display: 'flex', background: 'var(--nav-pill-bg)', padding: '3px', borderRadius: '9999px', gap: '3px' }}>
                     {(['low', 'medium', 'high'] as const).map((p) => {
-                      const label = p.charAt(0).toUpperCase() + p.slice(1);
                       const isActive = editPriority === p;
-                      const activeBg = p === 'high' ? 'rgba(232, 93, 93, 0.08)' : p === 'medium' ? 'rgba(245, 158, 11, 0.08)' : 'rgba(10, 10, 10, 0.04)';
-                      const activeBorder = p === 'high' ? 'var(--coral-losses)' : p === 'medium' ? 'var(--amber-warning)' : 'var(--border-color)';
-                      const activeColor = p === 'high' ? 'var(--coral-losses)' : p === 'medium' ? '#B45309' : 'var(--ink-color)';
-                      const dotColor = p === 'high' ? 'var(--coral-losses)' : p === 'medium' ? '#F59E0B' : 'var(--ink-muted)';
-                      
                       return (
-                        <button
-                          key={p}
-                          type="button"
-                          onClick={() => setEditPriority(p)}
-                          style={{
-                            flex: 1,
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '6px',
-                            padding: '10px 12px',
-                            borderRadius: 'var(--radius-md)',
-                            fontSize: '0.85rem',
-                            fontWeight: 600,
-                            cursor: 'pointer',
-                            transition: 'all 0.2s ease',
-                            backgroundColor: isActive ? activeBg : 'rgba(10, 10, 10, 0.01)',
-                            border: `1px solid ${isActive ? activeBorder : 'var(--border-color)'}`,
-                            color: isActive ? activeColor : 'var(--ink-muted)',
-                          }}
-                        >
-                          <span style={{
-                            width: '6px',
-                            height: '6px',
-                            borderRadius: '50%',
-                            backgroundColor: dotColor,
-                          }} />
-                          {label}
+                        <button key={p} type="button" onClick={() => setEditPriority(p)}
+                          style={{ flex: 1, padding: '8px 0', borderRadius: '9999px', fontSize: '0.82rem', fontWeight: isActive ? 650 : 500, border: 'none', cursor: 'pointer', transition: 'all 0.2s', background: isActive ? PRIORITY_COLORS[p].bg : 'transparent', color: isActive ? PRIORITY_COLORS[p].color : 'var(--ink-muted)', boxShadow: isActive ? '0 1px 3px rgba(0,0,0,0.08)' : 'none' }}>
+                          {p.charAt(0).toUpperCase() + p.slice(1)}
                         </button>
                       );
                     })}
                   </div>
                 </div>
 
-                {/* Auto-Allocation Recommendation panel */}
+                {/* Auto-Allocation Advisor */}
                 {(() => {
                   const otherContributions = getOtherBucketsContributionSum(editingBucket?.id);
                   const remaining = Math.max(0, coreDisposable - otherContributions);
                   let suggestedMax = getSuggestedMax(editPriority, remaining);
-
-                  // Cap the suggested maximum by the remaining target to save (target - current accumulated)
                   const targetVal = parseFloat(editTarget.replace(/,/g, '')) || 0;
                   const currentAccumulated = editingBucket ? editingBucket.current : 0;
                   const remainingTarget = Math.max(0, targetVal - currentAccumulated);
-                  if (remainingTarget > 0 && suggestedMax > remainingTarget) {
-                    suggestedMax = remainingTarget;
-                  } else if (remainingTarget === 0) {
-                    suggestedMax = 0;
-                  }
-
+                  if (remainingTarget > 0 && suggestedMax > remainingTarget) suggestedMax = remainingTarget;
+                  else if (remainingTarget === 0) suggestedMax = 0;
                   const currentMonthlyInput = parseFloat(editMonthly.replace(/,/g, '')) || 0;
                   const isExceeded = currentMonthlyInput > suggestedMax;
-                  
                   return (
-                    <div className="card" style={{
-                      backgroundColor: 'rgba(10, 10, 10, 0.02)',
-                      border: '1px dashed var(--border-color)',
-                      padding: '12px var(--space-3)',
-                      borderRadius: 'var(--radius-md)',
-                      fontSize: '0.82rem',
-                      color: 'var(--ink-color)',
-                    }}>
-                      <div className="flex justify-between align-center" style={{ marginBottom: '8px' }}>
-                        <strong style={{ fontWeight: 650, color: 'var(--ink-muted)' }}>Auto-Allocation Advisor</strong>
-                        <button
-                          type="button"
-                          style={{
-                            fontSize: '0.78rem',
-                            background: 'none',
-                            border: 'none',
-                            color: 'var(--emerald-gains)',
-                            textDecoration: 'underline',
-                            cursor: suggestedMax > 0 ? 'pointer' : 'default',
-                            opacity: suggestedMax > 0 ? 1 : 0.5,
-                            padding: 0,
-                            fontWeight: 600,
-                          }}
-                          onClick={() => setEditMonthly(suggestedMax.toLocaleString('en-US'))}
-                          disabled={suggestedMax <= 0}
-                        >
+                    <div style={{ background: 'var(--nav-pill-bg)', border: '1px solid var(--border-color)', borderRadius: '1rem', padding: '1rem' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                        <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--ink-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Auto-Allocation Advisor</span>
+                        <button type="button" style={{ fontSize: '0.75rem', color: 'var(--emerald-gains)', fontWeight: 650, background: 'none', border: 'none', cursor: 'pointer' }}
+                          onClick={() => setEditMonthly(suggestedMax.toLocaleString('en-US'))} disabled={suggestedMax <= 0}>
                           Apply Max (Rs. {suggestedMax.toLocaleString()})
                         </button>
                       </div>
-                      
-                      <div className="flex flex-col gap-1" style={{ color: 'var(--ink-muted)', fontSize: '0.78rem' }}>
-                        <div className="flex justify-between">
-                          <span>Baseline:</span>
-                          <span className="num">Rs. {baseSalary.toLocaleString()} (Salary) - Rs. {leaseExpense.toLocaleString()} (Lease) = Rs. {coreDisposable.toLocaleString()}</span>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', fontSize: '0.78rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <span style={{ color: 'var(--ink-muted)' }}>Baseline:</span>
+                          <span className="num" style={{ color: 'var(--ink-color)' }}>Rs. {baseSalary.toLocaleString()} − Rs. {leaseExpense.toLocaleString()} = Rs. {coreDisposable.toLocaleString()}</span>
                         </div>
                         {otherContributions > 0 && (
-                          <div className="flex justify-between">
-                            <span>Other Buckets:</span>
-                            <span className="num" style={{ color: 'var(--coral-losses)' }}>- Rs. {otherContributions.toLocaleString()} / mo</span>
+                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span style={{ color: 'var(--ink-muted)' }}>Other buckets:</span>
+                            <span className="num" style={{ color: 'var(--coral-losses)' }}>−Rs. {otherContributions.toLocaleString()} / mo</span>
                           </div>
                         )}
-                        <div className="flex justify-between" style={{ borderTop: '1px solid var(--border-color)', paddingTop: '4px', marginTop: '2px', fontWeight: 600 }}>
-                          <span>Remaining Pool:</span>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '5px', borderTop: '1px solid var(--border-color)', fontWeight: 600 }}>
+                          <span style={{ color: 'var(--ink-color)' }}>Remaining Pool:</span>
                           <span className="num" style={{ color: 'var(--ink-color)' }}>Rs. {remaining.toLocaleString()}</span>
                         </div>
-                        <div className="flex justify-between" style={{ marginTop: '2px' }}>
-                          <span>Suggested ({editPriority === 'high' ? '70%' : editPriority === 'medium' ? '35%' : '15%'}):</span>
-                          <span className="num" style={{ fontWeight: 650, color: 'var(--emerald-gains)' }}>Rs. {suggestedMax.toLocaleString()} / mo</span>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <span style={{ color: 'var(--ink-muted)' }}>Suggested ({editPriority === 'high' ? '70%' : editPriority === 'medium' ? '35%' : '15%'}):</span>
+                          <span className="num" style={{ color: 'var(--emerald-gains)', fontWeight: 650 }}>Rs. {suggestedMax.toLocaleString()} / mo</span>
                         </div>
                       </div>
-
                       {isExceeded && (
-                        <div style={{
-                          backgroundColor: 'rgba(245, 158, 11, 0.05)',
-                          border: '1px solid rgba(245, 158, 11, 0.15)',
-                          padding: '6px 10px',
-                          borderRadius: 'var(--radius-sm)',
-                          color: '#B45309',
-                          fontSize: '0.78rem',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '6px',
-                          marginTop: '10px',
-                        }}>
-                          <AlertCircle size={12} style={{ flexShrink: 0 }} />
-                          <span>Warning: Exceeds safe suggested monthly maximum.</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '10px', padding: '8px 10px', background: 'rgba(228,168,59,0.08)', border: '1px solid rgba(228,168,59,0.25)', borderRadius: '8px', fontSize: '0.75rem', color: '#B45309' }}>
+                          <AlertCircle size={12} style={{ flexShrink: 0 }} /><span>Exceeds safe suggested monthly maximum.</span>
                         </div>
                       )}
                     </div>
@@ -927,28 +587,19 @@ export const SavingsTracker: React.FC<SavingsTrackerProps> = ({
                 })()}
 
                 <div className="input-group">
-                  <label className="input-label">Monthly Target Contribution (MUR)</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. 5,000"
-                    value={editMonthly}
-                    onChange={(e) => handleCurrencyChange(e.target.value, setEditMonthly)}
-                    className="input-field num-input"
-                  />
+                  <label className="input-label">Monthly Contribution (MUR)</label>
+                  <input type="text" placeholder="e.g. 5,000" value={editMonthly} onChange={(e) => handleCurrencyChange(e.target.value, setEditMonthly)} className="input-field num-input" />
                 </div>
 
-                <div className="flex justify-between align-center" style={{ marginTop: 'var(--space-2)' }}>
-                  <button type="button" className="btn btn-text text-loss" style={{ fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '4px', paddingLeft: 0 }} onClick={() => setShowDeleteConfirm(true)}>
-                    <Trash2 size={14} /> Delete Bucket
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', marginTop: '0.5rem' }}>
+                  <button type="button"
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '8px 14px', background: 'var(--coral-losses-bg)', color: 'var(--coral-losses)', border: '1px solid var(--coral-losses)', borderRadius: '9999px', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer' }}
+                    onClick={() => setShowDeleteConfirm(true)}>
+                    <Trash2 size={13} /> Delete
                   </button>
-                  
-                  <div className="flex gap-2">
-                    <button type="button" className="btn btn-secondary" onClick={() => setEditingBucket(null)}>
-                      Cancel
-                    </button>
-                    <button type="submit" className="btn btn-primary">
-                      Save Changes
-                    </button>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button type="button" className="btn btn-secondary" onClick={() => setEditingBucket(null)}>Cancel</button>
+                    <button type="submit" className="btn btn-primary">Save Changes</button>
                   </div>
                 </div>
               </form>
