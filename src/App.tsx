@@ -357,11 +357,15 @@ function App() {
     if (!lastApplied) {
       // First time initialization: set to latest26thStr without applying to avoid double-charging start balance
       try {
-        await supabase
+        const { data: updatedProfiles } = await supabase
           .from('profiles')
           .update({ last_recurring_applied_month: latest26thStr })
-          .eq('id', userId);
-        console.log(`Initialized last_recurring_applied_month to ${latest26thStr}`);
+          .eq('id', userId)
+          .is('last_recurring_applied_month', null)
+          .select();
+        if (updatedProfiles && updatedProfiles.length > 0) {
+          console.log(`Initialized last_recurring_applied_month to ${latest26thStr}`);
+        }
       } catch (err) {
         console.error('Error initializing recurring applied month:', err);
       }
@@ -412,17 +416,25 @@ function App() {
     const newBalance = Number(profile.current_balance) + totalTransactionsAmount;
 
     try {
-      // Update profile balance and last applied month tracker
-      const { error: profileError } = await supabase
+      // Update profile balance and last applied month tracker atomically using optimistic concurrency control
+      const { data: updatedProfiles, error: profileError } = await supabase
         .from('profiles')
         .update({
           current_balance: newBalance,
           last_recurring_applied_month: latest26thStr,
           updated_at: new Date().toISOString()
         })
-        .eq('id', userId);
+        .eq('id', userId)
+        .eq('last_recurring_applied_month', lastApplied)
+        .select();
 
       if (profileError) throw profileError;
+
+      // If no profile was updated, it means another concurrent session did it first
+      if (!updatedProfiles || updatedProfiles.length === 0) {
+        console.log('Monthly recurring salary application was already processed concurrently.');
+        return;
+      }
 
       // Create transaction logs for complete tracking integrity
       const transactionsToAdd: any[] = [];
