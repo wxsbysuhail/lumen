@@ -303,17 +303,15 @@ export const Dashboard: React.FC<DashboardProps> = ({
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -15 }}
       transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-      className="flex flex-col gap-6"
+      className="flex flex-col gap-6 mobile-dashboard-container"
     >
       {/* Hero Net Worth Section */}
-      <div className="card" style={{
-        padding: 'var(--space-8) var(--space-6)',
+      <div className="card hero-card" style={{
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
         textAlign: 'center',
         gap: 'var(--space-2)',
-        backgroundColor: 'var(--card-bg)',
         position: 'relative',
         zIndex: 1,
       }}>
@@ -357,11 +355,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
             <Edit2 size={12} />
           </button>
         </div>
-        <div className="flex align-center justify-center gap-2">
-          <span className="serif-title" style={{ fontSize: '2.5rem', fontStyle: 'italic', fontWeight: 300, color: 'var(--ink-light)', marginTop: '-8px' }}>
+        <div className="flex align-baseline justify-center gap-1" style={{ color: 'var(--ink-color)', fontFamily: 'var(--font-sans)' }}>
+          <span style={{ fontSize: '1.8rem', fontWeight: 500, color: 'var(--ink-light)', alignSelf: 'flex-start', marginTop: '6px' }}>
             Rs.
           </span>
-          <h1 className="hero-num">
+          <h1 className="hero-num" style={{ margin: 0 }}>
             <AnimatedNumber value={balance} />
           </h1>
         </div>
@@ -391,9 +389,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
           <div style={{
             width: '100%',
             maxWidth: '100%',
-            height: '6px',
-            backgroundColor: 'var(--border-color)',
-            borderRadius: '3px',
+            height: '10px',
+            backgroundColor: 'rgba(128, 128, 128, 0.08)',
+            borderRadius: '9999px',
             overflow: 'hidden',
             display: 'flex',
             marginTop: '16px',
@@ -491,8 +489,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
       {/* Safe to Spend Card */}
       <div className="card flex flex-col justify-between" style={{
-        padding: 'var(--space-8)',
-        backgroundColor: 'var(--card-bg)',
         position: 'relative',
         overflow: 'hidden',
         minHeight: '200px',
@@ -578,9 +574,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
         {startingDisposablePool > 0 && (
           <div style={{
             width: '100%',
-            height: '6px',
-            backgroundColor: 'var(--border-color)',
-            borderRadius: '3px',
+            height: '10px',
+            backgroundColor: 'rgba(128, 128, 128, 0.08)',
+            borderRadius: '9999px',
             overflow: 'hidden',
             zIndex: 1,
           }}>
@@ -593,6 +589,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   : 'var(--coral-losses)',
               width: `${Math.max(0, Math.min(100, (safeToSpend / startingDisposablePool) * 100))}%`,
               transition: 'width 0.8s cubic-bezier(0.16, 1, 0.3, 1)',
+              borderRadius: '9999px',
             }} />
           </div>
         )}
@@ -618,10 +615,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
           
           <div className="flex flex-col gap-2">
             <div style={{
-              height: '4px',
+              height: '8px',
               width: '100%',
-              backgroundColor: 'var(--border-color)',
-              borderRadius: '2px',
+              backgroundColor: 'rgba(128, 128, 128, 0.08)',
+              borderRadius: '9999px',
               overflow: 'hidden',
               display: 'flex',
             }}>
@@ -629,11 +626,13 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 height: '100%',
                 backgroundColor: 'var(--emerald-gains)',
                 width: `${(income + totalIn) > 0 ? Math.min(100, ((income + totalIn) / ((income + totalIn) + totalOut)) * 100) : 50}%`,
+                borderRadius: '9999px 0 0 9999px',
               }} />
               <div style={{
                 height: '100%',
                 backgroundColor: 'var(--coral-losses)',
                 width: `${totalOut > 0 ? Math.min(100, (totalOut / ((income + totalIn) + totalOut)) * 100) : 50}%`,
+                borderRadius: '0 9999px 9999px 0',
               }} />
             </div>
             <div className="flex justify-between" style={{ fontSize: '0.78rem', color: 'var(--ink-light)' }}>
@@ -660,7 +659,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </p>
           </div>
 
-          <div style={{ width: '100%', position: 'relative', height: '8px', backgroundColor: 'var(--border-color)', borderRadius: '4px', overflow: 'hidden' }}>
+          <div style={{ width: '100%', position: 'relative', height: '10px', backgroundColor: 'rgba(128, 128, 128, 0.08)', borderRadius: '9999px', overflow: 'hidden' }}>
             <motion.div
               initial={{ width: 0 }}
               animate={{ width: `${Math.min(100, Math.max(0, savingsRate))}%` }}
@@ -668,7 +667,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
               style={{
                 height: '100%',
                 backgroundColor: 'var(--emerald-gains)',
-                borderRadius: '4px',
+                borderRadius: '9999px',
               }}
             />
           </div>
@@ -679,8 +678,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
       <div className="card">
         <div className="flex justify-between align-center" style={{ marginBottom: 'var(--space-4)' }}>
           <button 
-            className="btn btn-secondary" 
-            style={{ padding: '6px 12px', fontSize: '0.85rem' }} 
+            className="btn btn-secondary log-transaction-btn" 
+            style={{ padding: '8px 16px', fontSize: '0.85rem' }} 
             onClick={() => {
               setDesc('');
               setAmount('');

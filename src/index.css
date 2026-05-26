@@ -15,6 +15,8 @@
   --coral-losses-bg: rgba(232, 93, 93, 0.06);
   
   --card-bg: #FFFFFF;
+  --card-bg-translucent: rgba(255, 255, 255, 0.85);
+  --card-border: rgba(10, 10, 10, 0.05);
   --sidebar-width: 260px;
   --header-bg: rgba(250, 250, 247, 0.75);
   --nav-pill-bg: rgba(10, 10, 10, 0.04);
@@ -62,6 +64,8 @@
   --coral-losses-bg: rgba(239, 68, 68, 0.08);
   
   --card-bg: #141413;
+  --card-bg-translucent: rgba(20, 20, 19, 0.82);
+  --card-border: rgba(247, 247, 242, 0.08);
   --header-bg: rgba(12, 12, 11, 0.75);
   --nav-pill-bg: rgba(247, 247, 242, 0.06);
   --nav-pill-border: rgba(247, 247, 242, 0.09);
@@ -146,23 +150,23 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .num {
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   font-variant-numeric: tabular-nums;
-  letter-spacing: -0.03em;
-  font-feature-settings: "zero" 0;
+  letter-spacing: -0.02em;
+  font-feature-settings: "tnum" 1;
 }
 
 /* Hero numbers */
 .hero-num {
-  font-family: var(--font-serif);
+  font-family: var(--font-sans);
   font-size: 4.5rem;
   line-height: 0.95;
   letter-spacing: -0.04em;
-  font-weight: 400;
+  font-weight: 500;
 }
 @media (max-width: 768px) {
   .hero-num {
-    font-size: 3.5rem;
+    font-size: 3.2rem;
   }
 }
 
@@ -199,32 +203,63 @@ h1, h2, h3, h4, h5, h6 {
 
 /* Cards & Containers */
 .card {
-  background: var(--card-bg);
-  border: 1px solid var(--border-color);
+  background: var(--card-bg-translucent);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--card-border);
   border-radius: var(--radius-xl);
   padding: var(--space-8);
-  transition: border-color var(--transition-normal);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.02), 0 1px 2px rgba(0, 0, 0, 0.01);
+  transition: background-color var(--transition-normal), border-color var(--transition-normal), box-shadow var(--transition-normal);
   position: relative;
   overflow: hidden;
 }
 
 @media (max-width: 768px) {
   .card {
-    padding: var(--space-4);
+    padding: 1.5rem !important; /* Increase mobile card padding to let content breathe */
   }
 }
 
 .card:hover {
   border-color: var(--border-hover);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.04), 0 2px 8px rgba(0, 0, 0, 0.02);
 }
 
 .card-title {
-  font-size: 0.9rem;
+  font-size: 0.76rem;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.08em; /* tracking-wide */
   font-weight: 600;
-  color: var(--ink-muted);
+  color: var(--ink-light); /* subtle, muted color like text-gray-500 */
   margin-bottom: var(--space-4);
+}
+
+/* Custom interactive Log Transaction Button */
+.log-transaction-btn {
+  border-radius: 9999px !important; /* fully rounded-full */
+  background: var(--nav-pill-bg) !important; /* subtle background tint */
+  border: 1px solid var(--border-color) !important;
+  color: var(--ink-color) !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: var(--space-2) !important;
+  padding: 10px 20px !important;
+  font-weight: 600 !important;
+  font-family: var(--font-sans) !important;
+  transition: all var(--transition-fast) !important;
+}
+
+.log-transaction-btn:hover {
+  background: var(--border-hover) !important;
+  border-color: var(--border-focus) !important;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+}
+
+.log-transaction-btn:active {
+  transform: translateY(0) scale(0.97);
 }
 
 /* Flex & Grid helpers */
