@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Users, Mail, AlertCircle, Heart, UserPlus, Trash2, Check, X, ArrowUpRight, ArrowDownRight, RefreshCw } from 'lucide-react';
+import { Mail, AlertCircle, Heart, UserPlus, Trash2, Check, X, ArrowUpRight, ArrowDownRight, RefreshCw } from 'lucide-react';
 
 interface JointSyncProps {
   session: any;
