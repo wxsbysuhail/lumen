@@ -1318,7 +1318,7 @@ function App() {
         gap: 'var(--space-4)',
       }}>
         <div className="hero-glow pulsing-glow" />
-        <h1 className="serif-title" style={{ fontSize: '2.5rem', fontStyle: 'italic', margin: 0 }}>Lumen</h1>
+        <h1 className="logo-text" style={{ fontSize: '2.5rem', margin: 0, fontStyle: 'normal' }}>Lumen</h1>
         <div style={{
           width: '24px',
           height: '24px',
