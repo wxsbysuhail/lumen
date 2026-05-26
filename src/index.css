@@ -302,21 +302,25 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .input-field {
-  background: var(--bg-color);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-md);
-  padding: var(--space-3) var(--space-4);
+  background: rgba(128, 128, 128, 0.08); /* soft, filled look typical of modern mobile apps */
+  border: 1px solid transparent;
+  border-radius: var(--radius-lg); /* rounded-xl (12px) */
+  padding: 0 var(--space-4);
+  height: 3.25rem; /* generous h-13 tap target height */
+  display: inline-flex;
+  align-items: center;
   font-family: var(--font-sans);
-  font-size: 1rem;
+  font-size: 0.95rem;
   color: var(--ink-color);
   outline: none;
-  transition: border-color var(--transition-fast), background-color var(--transition-fast);
+  transition: all var(--transition-fast);
   width: 100%;
 }
 
 .input-field:focus {
   border-color: var(--border-focus);
   background-color: var(--card-bg);
+  box-shadow: 0 0 0 3px rgba(128, 128, 128, 0.15); /* focus ring */
 }
 
 .input-field.num-input {
@@ -387,27 +391,28 @@ h1, h2, h3, h4, h5, h6 {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 30px;
-  height: 30px;
+  width: 34px;
+  height: 34px;
   border-radius: 50%;
   color: var(--ink-muted);
-  background: transparent;
+  background: rgba(128, 128, 128, 0.05); /* subtle background tint */
   cursor: pointer;
   transition: all var(--transition-fast);
-  border: none;
+  border: 1px solid transparent;
 }
 
 .icon-btn:hover {
   background: var(--nav-pill-bg);
   color: var(--ink-color);
+  transform: translateY(-1px);
 }
 
 .icon-btn:active {
-  transform: scale(0.92);
+  transform: scale(0.92) translateY(0);
 }
 
 .icon-btn-danger {
-  color: var(--ink-muted);
+  color: var(--coral-losses);
 }
 
 .icon-btn-danger:hover {
@@ -1041,28 +1046,29 @@ h1, h2, h3, h4, h5, h6 {
 .custom-slider {
   -webkit-appearance: none;
   width: 100%;
-  height: 4px;
-  border-radius: 2px;
+  height: 6px; /* thickened track */
+  border-radius: 9999px;
   background: var(--border-color);
   outline: none;
   margin: var(--space-4) 0;
+  cursor: pointer;
 }
 
 .custom-slider::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 16px;
-  height: 16px;
+  width: 24px; /* w-6 h-6 mobile touch target */
+  height: 24px;
   border-radius: 50%;
-  background: var(--ink-color);
+  background: #FFFFFF; /* clean iOS white thumb */
+  border: 0.5px solid rgba(0, 0, 0, 0.04);
   cursor: pointer;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.15), 0 1px 1px rgba(0, 0, 0, 0.05); /* iOS-style drop shadow */
   transition: transform var(--transition-fast);
-  border: 2px solid var(--bg-color);
-  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
 }
 
 .custom-slider::-webkit-slider-thumb:hover {
-  transform: scale(1.15);
+  transform: scale(1.1);
 }
 
 /* Pulse Animation for Glow */

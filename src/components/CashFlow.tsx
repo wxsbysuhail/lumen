@@ -251,9 +251,9 @@ export const CashFlow: React.FC<CashFlowProps> = ({
       transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
       className="flex flex-col gap-8"
     >
-      <div className="flex flex-col gap-2">
-        <h1 className="serif-title" style={{ fontSize: '2.5rem', fontWeight: 400, fontStyle: 'italic' }}>Cash Flow Planner</h1>
-        <p style={{ color: 'var(--ink-muted)' }}>
+      <div className="flex flex-col gap-1">
+        <h1 style={{ fontFamily: 'var(--font-sans)', fontSize: '2.25rem', fontWeight: 700, letterSpacing: '-0.03em', color: 'var(--ink-color)', margin: 0 }}>Cash Flow Planner</h1>
+        <p style={{ color: 'var(--ink-light)', fontSize: '0.9rem', lineHeight: '1.5', margin: 0 }}>
           Review your recurring allocations, adjust your budget boundaries, and unlock disposable cash.
         </p>
       </div>
@@ -396,6 +396,9 @@ export const CashFlow: React.FC<CashFlowProps> = ({
                   value={needsPct}
                   onChange={(e) => handleSliderChange('needs', parseInt(e.target.value))}
                   className="custom-slider"
+                  style={{
+                    background: `linear-gradient(to right, var(--emerald-gains) 0%, var(--emerald-gains) ${needsPct}%, rgba(128, 128, 128, 0.08) ${needsPct}%, rgba(128, 128, 128, 0.08) 100%)`
+                  }}
                 />
               </div>
 
@@ -411,6 +414,9 @@ export const CashFlow: React.FC<CashFlowProps> = ({
                   value={wantsPct}
                   onChange={(e) => handleSliderChange('wants', parseInt(e.target.value))}
                   className="custom-slider"
+                  style={{
+                    background: `linear-gradient(to right, var(--emerald-gains) 0%, var(--emerald-gains) ${wantsPct}%, rgba(128, 128, 128, 0.08) ${wantsPct}%, rgba(128, 128, 128, 0.08) 100%)`
+                  }}
                 />
               </div>
 
@@ -426,6 +432,9 @@ export const CashFlow: React.FC<CashFlowProps> = ({
                   value={savingsPct}
                   onChange={(e) => handleSliderChange('savings', parseInt(e.target.value))}
                   className="custom-slider"
+                  style={{
+                    background: `linear-gradient(to right, var(--emerald-gains) 0%, var(--emerald-gains) ${savingsPct}%, rgba(128, 128, 128, 0.08) ${savingsPct}%, rgba(128, 128, 128, 0.08) 100%)`
+                  }}
                 />
               </div>
             </div>
@@ -507,17 +516,31 @@ export const CashFlow: React.FC<CashFlowProps> = ({
           <form onSubmit={handleAdd} className="flex flex-col gap-4">
             <div className="input-group">
               <label className="input-label">Type</label>
-              <div className="flex gap-2">
+              <div style={{
+                display: 'flex',
+                background: 'rgba(128, 128, 128, 0.08)',
+                padding: '3px',
+                borderRadius: '9999px',
+                width: '100%',
+                position: 'relative'
+              }}>
                 <button
                   type="button"
-                  className="btn"
                   style={{
                     flex: 1,
-                    backgroundColor: type === 'expense' ? 'var(--ink-color)' : 'var(--bg-color)',
-                    color: type === 'expense' ? 'var(--bg-color)' : 'var(--ink-color)',
-                    border: '1px solid var(--border-color)',
-                    fontSize: '0.85rem',
-                    padding: '8px 0',
+                    backgroundColor: type === 'expense' ? 'var(--card-bg)' : 'transparent',
+                    color: 'var(--ink-color)',
+                    border: 'none',
+                    borderRadius: '9999px',
+                    fontSize: '0.82rem',
+                    padding: '10px 0',
+                    fontWeight: type === 'expense' ? 600 : 500,
+                    boxShadow: type === 'expense' ? '0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04)' : 'none',
+                    transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                    display: 'flex',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    cursor: 'pointer',
                   }}
                   onClick={() => { setType('expense'); setCategory('needs:Other Need'); }}
                 >
@@ -525,14 +548,21 @@ export const CashFlow: React.FC<CashFlowProps> = ({
                 </button>
                 <button
                   type="button"
-                  className="btn"
                   style={{
                     flex: 1,
-                    backgroundColor: type === 'income' ? 'var(--ink-color)' : 'var(--bg-color)',
-                    color: type === 'income' ? 'var(--bg-color)' : 'var(--ink-color)',
-                    border: '1px solid var(--border-color)',
-                    fontSize: '0.85rem',
-                    padding: '8px 0',
+                    backgroundColor: type === 'income' ? 'var(--card-bg)' : 'transparent',
+                    color: 'var(--ink-color)',
+                    border: 'none',
+                    borderRadius: '9999px',
+                    fontSize: '0.82rem',
+                    padding: '10px 0',
+                    fontWeight: type === 'income' ? 600 : 500,
+                    boxShadow: type === 'income' ? '0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04)' : 'none',
+                    transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                    display: 'flex',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    cursor: 'pointer',
                   }}
                   onClick={() => { setType('income'); setCategory('income'); }}
                 >
@@ -570,17 +600,13 @@ export const CashFlow: React.FC<CashFlowProps> = ({
                 <label className="input-label">Commitment Category</label>
                 <button
                   type="button"
-                  className="input-field flex justify-between align-center"
+                  className="input-field"
                   style={{
-                    background: 'var(--bg-color)',
                     textAlign: 'left',
                     cursor: 'pointer',
                     display: 'flex',
                     justifyContent: 'space-between',
                     alignItems: 'center',
-                    padding: 'var(--space-3) var(--space-4)',
-                    border: '1px solid var(--border-color)',
-                    borderRadius: 'var(--radius-md)',
                   }}
                   onClick={() => {
                     setDropdownOpen(!dropdownOpen);
@@ -806,10 +832,10 @@ export const CashFlow: React.FC<CashFlowProps> = ({
                       <div className="flex align-center gap-3">
                         <span className="num text-gain" style={{ fontWeight: 650 }}>Rs. {item.amount.toLocaleString()}</span>
                         <button type="button" className="icon-btn" title="Edit" onClick={() => startEdit(item)}>
-                          <Edit2 size={14} />
+                          <Edit2 size={16} />
                         </button>
                         <button type="button" className="icon-btn icon-btn-danger" title="Delete" onClick={() => setConfirmDeleteId(item.id)}>
-                          <Trash2 size={14} />
+                          <Trash2 size={16} />
                         </button>
                       </div>
                     )}
@@ -850,10 +876,10 @@ export const CashFlow: React.FC<CashFlowProps> = ({
                       <div className="flex align-center gap-3">
                         <span className="num text-loss" style={{ fontWeight: 650 }}>Rs. {item.amount.toLocaleString()}</span>
                         <button type="button" className="icon-btn" title="Edit" onClick={() => startEdit(item)}>
-                          <Edit2 size={14} />
+                          <Edit2 size={16} />
                         </button>
                         <button type="button" className="icon-btn icon-btn-danger" title="Delete" onClick={() => setConfirmDeleteId(item.id)}>
-                          <Trash2 size={14} />
+                          <Trash2 size={16} />
                         </button>
                       </div>
                     )}
