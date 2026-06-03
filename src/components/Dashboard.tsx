@@ -15,6 +15,9 @@ interface Transaction {
   type: 'income' | 'expense';
   category: string;
   date: string;
+  split_with_id?: string;
+  split_amount?: number;
+  split_settled?: boolean;
 }
 
 interface DashboardProps {

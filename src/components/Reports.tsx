@@ -7,7 +7,6 @@ import {
   TrendingUp,
   Edit2,
   Trash2,
-  X,
   ChevronDown
 } from 'lucide-react';
 
