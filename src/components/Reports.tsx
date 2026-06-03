@@ -4,7 +4,11 @@ import {
   Search, 
   BrainCircuit, 
   SlidersHorizontal,
-  TrendingUp
+  TrendingUp,
+  Edit2,
+  Trash2,
+  X,
+  ChevronDown
 } from 'lucide-react';
 
 const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -22,6 +26,16 @@ interface ReportsProps {
   transactions: Transaction[];
   monthlyIncome: number;
   generalBalance: number;
+  onUpdateTransaction?: (
+    id: string,
+    desc: string,
+    amount: number,
+    type: 'income' | 'expense',
+    category: string,
+    splitWithId?: string,
+    splitAmount?: number
+  ) => void;
+  onDeleteTransaction?: (id: string) => void;
 }
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -51,12 +65,74 @@ export const Reports: React.FC<ReportsProps> = ({
   transactions,
   monthlyIncome,
   generalBalance,
+  onUpdateTransaction,
+  onDeleteTransaction,
 }) => {
   const [period, setPeriod] = useState<'this-month' | 'last-30' | 'all-time'>('this-month');
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState<'date-desc' | 'date-asc' | 'amount-desc' | 'amount-asc'>('date-desc');
   const [activeSegmentIndex, setActiveSegmentIndex] = useState<number | null>(null);
   const [hoveredPointIndex, setHoveredPointIndex] = useState<number | null>(null);
+
+  // Edit modal states
+  const [showEditModal, setShowEditModal]   = useState(false);
+  const [editingTx, setEditingTx]           = useState<Transaction | null>(null);
+  const [desc, setDesc]                     = useState('');
+  const [amount, setAmount]                 = useState('');
+  const [type, setType]                     = useState<'income' | 'expense'>('expense');
+  const [category, setCategory]             = useState('');
+  const [dropdownOpen, setDropdownOpen]     = useState(false);
+  const [searchQuery, setSearchQuery]       = useState('');
+
+  // Currency input formatter
+  const handleCurrencyChange = (value: string, setter: (val: string) => void) => {
+    const clean = value.replace(/[^0-9.]/g, '');
+    const parts = clean.split('.');
+    if (parts.length > 2) return;
+    const formattedInt = parts[0] ? parseInt(parts[0], 10).toLocaleString('en-US') : '';
+    const formatted = parts[1] !== undefined ? `${formattedInt}.${parts[1].slice(0, 2)}` : formattedInt;
+    setter(clean === '' ? '' : formatted);
+  };
+
+  const handleStartEdit = (tx: Transaction) => {
+    setEditingTx(tx);
+    setDesc(tx.description);
+    handleCurrencyChange(tx.amount.toString(), setAmount);
+    setType(tx.type);
+    setCategory(tx.category);
+    setShowEditModal(true);
+  };
+
+  const handleModalClose = () => {
+    setEditingTx(null);
+    setDesc('');
+    setAmount('');
+    setCategory('');
+    setShowEditModal(false);
+  };
+
+  const handleTypeChange = (newType: 'income' | 'expense') => {
+    setType(newType);
+    const defaultCats = newType === 'income'
+      ? ['Salary', 'Freelance', 'Investments', 'Other In']
+      : ['Rent & Housing', 'Groceries', 'Utilities', 'Dining Out', 'Leisure', 'Transport', 'Other Out'];
+    setCategory(defaultCats[0]);
+    setSearchQuery('');
+  };
+
+  const categories = type === 'income'
+    ? ['Salary', 'Freelance', 'Investments', 'Other In']
+    : ['Rent & Housing', 'Groceries', 'Utilities', 'Dining Out', 'Leisure', 'Transport', 'Other Out'];
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!desc || !amount || !editingTx) return;
+    const parsedAmount = parseFloat(amount.replace(/,/g, '')) || 0;
+    if (onUpdateTransaction) {
+      onUpdateTransaction(editingTx.id, desc, parsedAmount, type, category);
+    }
+    handleModalClose();
+  };
 
   // Filter transactions based on selected period
   const filteredTransactions = useMemo(() => {
@@ -786,6 +862,7 @@ export const Reports: React.FC<ReportsProps> = ({
                   <th>Description</th>
                   <th>Category</th>
                   <th style={{ textAlign: 'right' }}>Amount</th>
+                  <th style={{ width: '80px', textAlign: 'right' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -815,6 +892,34 @@ export const Reports: React.FC<ReportsProps> = ({
                     }}>
                       {tx.type === 'income' ? '+' : '-'} Rs. {tx.amount.toLocaleString()}
                     </td>
+                    <td style={{ textAlign: 'right' }}>
+                      <div style={{ display: 'inline-flex', gap: '4px' }}>
+                        <button
+                          type="button"
+                          onClick={() => handleStartEdit(tx)}
+                          className="icon-btn"
+                          style={{ width: '26px', height: '26px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--nav-pill-bg)', borderRadius: '6px', border: '1px solid var(--border-color)', cursor: 'pointer' }}
+                          title="Edit entry"
+                        >
+                          <Edit2 size={11} style={{ color: 'var(--ink-muted)' }} />
+                        </button>
+                        {onDeleteTransaction && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (confirm(`Delete "${tx.description}"?`)) {
+                                onDeleteTransaction(tx.id);
+                              }
+                            }}
+                            className="icon-btn icon-btn-danger"
+                            style={{ width: '26px', height: '26px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--coral-losses-bg)', borderRadius: '6px', border: '1px solid rgba(232, 93, 93, 0.15)', cursor: 'pointer' }}
+                            title="Delete entry"
+                          >
+                            <Trash2 size={11} style={{ color: 'var(--coral-losses)' }} />
+                          </button>
+                        )}
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -822,6 +927,121 @@ export const Reports: React.FC<ReportsProps> = ({
           </div>
         )}
       </div>
+
+      {/* ══ Modal — Edit Transaction ══════════════════════════════════════════ */}
+      {showEditModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '1rem' }}>
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: 8 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 8 }}
+            transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+            style={{ background: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '1.5rem', padding: '1.5rem', width: '100%', maxWidth: '400px', overflowY: 'auto', maxHeight: '90vh' }}
+          >
+            <h3 style={{ fontSize: '1.5rem', fontWeight: 400, fontStyle: 'italic', fontFamily: 'var(--font-serif)', color: 'var(--ink-color)', marginBottom: '1rem' }}>Edit Entry</h3>
+
+            <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              {/* Type toggle */}
+              <div className="input-group">
+                <label className="input-label">Type</label>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  {(['expense', 'income'] as const).map((t) => (
+                    <button
+                      key={t} type="button" onClick={() => handleTypeChange(t)}
+                      style={{
+                        flex: 1, padding: '8px', borderRadius: '10px', fontSize: '0.875rem', fontWeight: 500,
+                        border: '1px solid', cursor: 'pointer', transition: 'all 0.2s',
+                        background: type === t ? 'var(--ink-color)' : 'var(--nav-pill-bg)',
+                        color: type === t ? 'var(--bg-color)' : 'var(--ink-muted)',
+                        borderColor: type === t ? 'var(--ink-color)' : 'var(--border-color)',
+                      }}
+                    >
+                      {t.charAt(0).toUpperCase() + t.slice(1)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Description */}
+              <div className="input-group">
+                <label className="input-label">Description</label>
+                <input
+                  type="text" placeholder="e.g. Weekly Groceries" value={desc}
+                  onChange={(e) => setDesc(e.target.value)} required
+                  className="input-field"
+                />
+              </div>
+
+              {/* Amount */}
+              <div className="input-group">
+                <label className="input-label">Amount (MUR)</label>
+                <input
+                  type="text" placeholder="2,500" value={amount}
+                  onChange={(e) => handleCurrencyChange(e.target.value, setAmount)} required
+                  className="input-field num-input"
+                />
+              </div>
+
+              {/* Category dropdown */}
+              <div className="input-group">
+                <label className="input-label">Category</label>
+                <button
+                  type="button"
+                  onClick={() => { setDropdownOpen(!dropdownOpen); setSearchQuery(''); }}
+                  className="input-field"
+                  style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}
+                >
+                  <span style={{ fontWeight: 500 }}>{category || 'Select category'}</span>
+                  <ChevronDown size={14} style={{ color: 'var(--ink-muted)', transform: dropdownOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+                </button>
+                {dropdownOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    transition={{ duration: 0.2, ease: 'easeOut' }}
+                    style={{ marginTop: '8px', background: 'var(--nav-pill-bg)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '10px', display: 'flex', flexDirection: 'column', gap: '6px', overflow: 'hidden' }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '6px 10px', background: 'var(--card-bg)' }}>
+                      <Search size={13} style={{ color: 'var(--ink-light)', flexShrink: 0 }} />
+                      <input
+                        type="text" placeholder="Search or type custom..."
+                        value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
+                        onClick={(e) => e.stopPropagation()}
+                        style={{ background: 'transparent', border: 'none', outline: 'none', color: 'var(--ink-color)', fontSize: '0.78rem', width: '100%' }}
+                      />
+                    </div>
+                    <div style={{ maxHeight: '9rem', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                      {searchQuery.trim() !== '' && !categories.some(c => c.toLowerCase() === searchQuery.trim().toLowerCase()) && (
+                        <button
+                          type="button"
+                          onClick={() => { setCategory(searchQuery.trim()); setDropdownOpen(false); }}
+                          style={{ width: '100%', textAlign: 'left', padding: '7px 10px', borderRadius: '8px', background: 'var(--emerald-gains-bg)', color: 'var(--emerald-gains)', fontSize: '0.78rem', fontWeight: 600, border: 'none', cursor: 'pointer' }}
+                        >
+                          + Create "{searchQuery.trim()}"
+                        </button>
+                      )}
+                      {categories.filter(c => c.toLowerCase().includes(searchQuery.toLowerCase())).map((c) => (
+                        <button
+                          key={c} type="button"
+                          onClick={() => { setCategory(c); setDropdownOpen(false); }}
+                          style={{ width: '100%', textAlign: 'left', padding: '7px 10px', borderRadius: '8px', fontSize: '0.82rem', border: 'none', cursor: 'pointer', fontWeight: category === c ? 600 : 400, background: category === c ? 'var(--border-color)' : 'transparent', color: category === c ? 'var(--ink-color)' : 'var(--ink-muted)' }}
+                        >
+                          {c}
+                        </button>
+                      ))}
+                    </div>
+                  </motion.div>
+                )}
+              </div>
+
+              <div style={{ display: 'flex', gap: '10px', marginTop: '4px' }}>
+                <button type="button" onClick={handleModalClose} className="btn btn-secondary" style={{ flex: 1 }}>Cancel</button>
+                <button type="submit" className="btn btn-primary" style={{ flex: 1 }}>Save Changes</button>
+              </div>
+            </form>
+          </motion.div>
+        </div>
+      )}
     </motion.div>
   );
 };

@@ -85,6 +85,7 @@ export const CashFlow: React.FC<CashFlowProps> = ({
   const [amount, setAmount] = useState('');
   const [type, setType] = useState<'income' | 'expense'>('expense');
   const [category, setCategory] = useState<string>('needs:Other Need');
+  const [dueDay, setDueDay] = useState<number>(1);
 
   // Custom dropdown states
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -213,20 +214,30 @@ export const CashFlow: React.FC<CashFlowProps> = ({
     const parsedAmount = parseFloat(amount.replace(/,/g, '')) || 0;
     const targetCategory = type === 'income' ? 'income' : category;
     
+    const cleanDesc = desc.replace(/\s*\[due:\d+\]/, '').trim();
+    const finalDesc = `${cleanDesc} [due:${dueDay}]`;
+    
     if (editingItem) {
-      onUpdateRecurring(editingItem.id, desc, parsedAmount, type, targetCategory);
+      onUpdateRecurring(editingItem.id, finalDesc, parsedAmount, type, targetCategory);
       setEditingItem(null);
     } else {
-      onAddRecurring(desc, parsedAmount, type, targetCategory);
+      onAddRecurring(finalDesc, parsedAmount, type, targetCategory);
     }
     
     setDesc('');
     setAmount('');
+    setDueDay(type === 'income' ? 26 : 1);
   };
 
   const startEdit = (item: RecurringItem) => {
     setEditingItem(item);
-    setDesc(item.description);
+    
+    const match = item.description.match(/\[due:(\d+)\]/);
+    const parsedDueDay = match ? parseInt(match[1], 10) : (item.type === 'income' ? 26 : 1);
+    const cleanDesc = item.description.replace(/\s*\[due:\d+\]/, '').trim();
+
+    setDesc(cleanDesc);
+    setDueDay(parsedDueDay);
     setAmount(item.amount.toLocaleString('en-US'));
     setType(item.type);
     setCategory(item.category);
@@ -244,6 +255,7 @@ export const CashFlow: React.FC<CashFlowProps> = ({
     setAmount('');
     setType('expense');
     setCategory('needs:Other Need');
+    setDueDay(1);
     setSearchQuery('');
   };
 
@@ -573,6 +585,20 @@ export const CashFlow: React.FC<CashFlowProps> = ({
               />
             </div>
 
+            <div className="input-group">
+              <label className="input-label">Due Day of Month (1–31)</label>
+              <input
+                type="number"
+                min="1"
+                max="31"
+                placeholder="1"
+                value={dueDay}
+                onChange={(e) => setDueDay(Math.max(1, Math.min(31, parseInt(e.target.value, 10) || 1)))}
+                className="input-field num-input"
+                required
+              />
+            </div>
+
             {type === 'expense' && (
               <div className="input-group" style={{ position: 'relative' }}>
                 <label className="input-label">Commitment Category</label>
@@ -793,28 +819,35 @@ export const CashFlow: React.FC<CashFlowProps> = ({
               {incomeItems.length === 0 ? (
                 <div style={{ fontSize: '0.85rem', color: 'var(--ink-light)', padding: 'var(--space-2) 0' }}>No active inflows</div>
               ) : (
-                incomeItems.map(item => (
-                  <div key={item.id} className="flex justify-between align-center" style={{ padding: '10px 0', borderBottom: '1px solid var(--border-color)' }}>
-                    <div className="flex flex-col" style={{ flex: 1, paddingRight: 'var(--space-2)', minWidth: 0 }}>
-                      <span style={{ fontWeight: 550, fontSize: '0.9rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.description}</span>
-                      <span style={{ fontSize: '0.72rem', color: 'var(--emerald-gains)', fontWeight: 600, marginTop: '2px' }}>Monthly Inflow</span>
+                incomeItems.map(item => {
+                  const match = item.description.match(/\[due:(\d+)\]/);
+                  const dueDay = match ? parseInt(match[1], 10) : 26;
+                  const cleanDesc = item.description.replace(/\s*\[due:\d+\]/, '').trim();
+                  return (
+                    <div key={item.id} className="flex justify-between align-center" style={{ padding: '10px 0', borderBottom: '1px solid var(--border-color)' }}>
+                      <div className="flex flex-col" style={{ flex: 1, paddingRight: 'var(--space-2)', minWidth: 0 }}>
+                        <span style={{ fontWeight: 550, fontSize: '0.9rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cleanDesc}</span>
+                        <span style={{ fontSize: '0.72rem', color: 'var(--emerald-gains)', fontWeight: 600, marginTop: '2px' }}>
+                          Monthly Inflow · Due Day: {dueDay}
+                        </span>
+                      </div>
+                      {confirmDeleteId === item.id ? (
+                        <div className="flex align-center gap-2" style={{ background: 'var(--coral-losses-bg)', padding: '4px 8px', borderRadius: '6px' }}>
+                          <span style={{ fontSize: '0.75rem', color: 'var(--coral-losses)', fontWeight: 600 }}>Sure?</span>
+                          <button type="button" style={{ fontSize: '0.75rem', color: 'var(--coral-losses)', padding: '2px 4px', fontWeight: 650, background: 'none', border: 'none', cursor: 'pointer' }} onClick={() => { onRemoveRecurring(item.id); setConfirmDeleteId(null); }}>Delete</button>
+                          <span style={{ color: 'var(--border-color)' }}>|</span>
+                          <button type="button" style={{ fontSize: '0.75rem', color: 'var(--ink-muted)', padding: '2px 4px', background: 'none', border: 'none', cursor: 'pointer' }} onClick={() => setConfirmDeleteId(null)}>Cancel</button>
+                        </div>
+                      ) : (
+                        <div className="flex align-center gap-3" style={{ flexShrink: 0 }}>
+                          <span className="num text-gain" style={{ fontWeight: 650, fontSize: '0.9rem' }}>Rs. {item.amount.toLocaleString()}</span>
+                          <button type="button" className="icon-btn" title="Edit" onClick={() => startEdit(item)}><Edit2 size={15} /></button>
+                          <button type="button" className="icon-btn icon-btn-danger" title="Delete" onClick={() => setConfirmDeleteId(item.id)}><Trash2 size={15} /></button>
+                        </div>
+                      )}
                     </div>
-                    {confirmDeleteId === item.id ? (
-                      <div className="flex align-center gap-2" style={{ background: 'var(--coral-losses-bg)', padding: '4px 8px', borderRadius: '6px' }}>
-                        <span style={{ fontSize: '0.75rem', color: 'var(--coral-losses)', fontWeight: 600 }}>Sure?</span>
-                        <button type="button" style={{ fontSize: '0.75rem', color: 'var(--coral-losses)', padding: '2px 4px', fontWeight: 650, background: 'none', border: 'none', cursor: 'pointer' }} onClick={() => { onRemoveRecurring(item.id); setConfirmDeleteId(null); }}>Delete</button>
-                        <span style={{ color: 'var(--border-color)' }}>|</span>
-                        <button type="button" style={{ fontSize: '0.75rem', color: 'var(--ink-muted)', padding: '2px 4px', background: 'none', border: 'none', cursor: 'pointer' }} onClick={() => setConfirmDeleteId(null)}>Cancel</button>
-                      </div>
-                    ) : (
-                      <div className="flex align-center gap-3" style={{ flexShrink: 0 }}>
-                        <span className="num text-gain" style={{ fontWeight: 650, fontSize: '0.9rem' }}>Rs. {item.amount.toLocaleString()}</span>
-                        <button type="button" className="icon-btn" title="Edit" onClick={() => startEdit(item)}><Edit2 size={15} /></button>
-                        <button type="button" className="icon-btn icon-btn-danger" title="Delete" onClick={() => setConfirmDeleteId(item.id)}><Trash2 size={15} /></button>
-                      </div>
-                    )}
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
 
@@ -827,13 +860,17 @@ export const CashFlow: React.FC<CashFlowProps> = ({
                 expenseItems.map(item => {
                   const { classification, name } = parseCategory(item.category);
                   const chipStyle = getCategoryStyle(classification);
+                  const match = item.description.match(/\[due:(\d+)\]/);
+                  const dueDay = match ? parseInt(match[1], 10) : 1;
+                  const cleanDesc = item.description.replace(/\s*\[due:\d+\]/, '').trim();
                   return (
                     <div key={item.id} className="flex justify-between align-center" style={{ padding: '10px 0', borderBottom: '1px solid var(--border-color)' }}>
                       <div className="flex flex-col" style={{ flex: 1, paddingRight: 'var(--space-2)', minWidth: 0 }}>
-                        <span style={{ fontWeight: 550, fontSize: '0.9rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.description}</span>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginTop: '3px' }}>
+                        <span style={{ fontWeight: 550, fontSize: '0.9rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cleanDesc}</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginTop: '3px', flexWrap: 'wrap' }}>
                           <span style={{ fontSize: '0.68rem', fontWeight: 650, color: chipStyle.color, background: chipStyle.bg, padding: '1px 6px', borderRadius: '4px', textTransform: 'capitalize' }}>{classification}</span>
                           <span style={{ fontSize: '0.72rem', color: 'var(--ink-light)' }}>{name}</span>
+                          <span style={{ fontSize: '0.72rem', color: 'var(--ink-muted)', fontStyle: 'italic' }}>· Due Day: {dueDay}</span>
                         </div>
                       </div>
                       {confirmDeleteId === item.id ? (

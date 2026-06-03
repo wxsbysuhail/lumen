@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, useMotionValue, useTransform, animate } from 'framer-motion';
 import {
-  ArrowUpRight, ArrowDownRight, Plus, Calendar, TrendingUp, Edit2,
+  ArrowUpRight, ArrowDownRight, Plus, Calendar, TrendingUp, Edit2, Trash2,
   ChevronDown, Search, Wallet, PiggyBank, Info, Camera, Loader2, AlertCircle,
 } from 'lucide-react';
 import { createWorker } from 'tesseract.js';
@@ -32,6 +32,16 @@ interface DashboardProps {
     splitWithId?: string,
     splitAmount?: number
   ) => void;
+  onUpdateTransaction?: (
+    id: string,
+    desc: string,
+    amount: number,
+    type: 'income' | 'expense',
+    category: string,
+    splitWithId?: string,
+    splitAmount?: number
+  ) => void;
+  onDeleteTransaction?: (id: string) => void;
   savingsRate: number;
   totalBucketSavings?: number;
   holdingsValue?: number;
@@ -76,6 +86,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
   goal,
   transactions,
   onAddTransaction,
+  onUpdateTransaction,
+  onDeleteTransaction,
   savingsRate,
   totalBucketSavings = 0,
   holdingsValue = 0,
@@ -88,6 +100,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
 }) => {
   // ── Modal / form state ────────────────────────────────────────────────────
   const [showAddModal, setShowAddModal]           = useState(false);
+  const [editingTx, setEditingTx]                 = useState<Transaction | null>(null);
   const [desc, setDesc]                           = useState('');
   const [amount, setAmount]                       = useState('');
   const [type, setType]                           = useState<'income' | 'expense'>('expense');
@@ -103,14 +116,46 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const [scanError, setScanError]                 = useState('');
 
   useEffect(() => {
-    if (!showAddModal) setSplitWithPartner(false);
-  }, [showAddModal]);
+    if (!showAddModal) {
+      setSplitWithPartner(false);
+      if (!editingTx) {
+        setDesc('');
+        setAmount('');
+        setCategory('');
+      }
+    }
+  }, [showAddModal, editingTx]);
 
   useEffect(() => {
-    const handler = () => setShowAddModal(true);
+    const handler = () => {
+      setEditingTx(null);
+      setDesc('');
+      setAmount('');
+      setCategory('');
+      setShowAddModal(true);
+    };
     window.addEventListener('lumen:open-quick-log', handler);
     return () => window.removeEventListener('lumen:open-quick-log', handler);
   }, []);
+
+  const handleStartEdit = (tx: Transaction) => {
+    setEditingTx(tx);
+    setDesc(tx.description);
+    handleCurrencyChange(tx.amount.toString(), setAmount);
+    setType(tx.type);
+    setCategory(tx.category);
+    setSplitWithPartner(!!tx.split_with_id);
+    setShowAddModal(true);
+  };
+
+  const handleModalClose = () => {
+    setEditingTx(null);
+    setDesc('');
+    setAmount('');
+    setCategory('');
+    setSplitWithPartner(false);
+    setShowAddModal(false);
+  };
 
   // ── OCR receipt scan ──────────────────────────────────────────────────────
   const handleReceiptScan = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -214,12 +259,30 @@ export const Dashboard: React.FC<DashboardProps> = ({
     e.preventDefault();
     if (!desc || !amount) return;
     const parsedAmount = parseFloat(amount.replace(/,/g, '')) || 0;
-    if (splitWithPartner && partnerProfile) {
-      onAddTransaction(desc, parsedAmount, type, category, partnerProfile.id, parsedAmount / 2);
+    
+    if (editingTx) {
+      if (onUpdateTransaction) {
+        if (splitWithPartner && partnerProfile) {
+          onUpdateTransaction(editingTx.id, desc, parsedAmount, type, category, partnerProfile.id, parsedAmount / 2);
+        } else {
+          onUpdateTransaction(editingTx.id, desc, parsedAmount, type, category);
+        }
+      }
     } else {
-      onAddTransaction(desc, parsedAmount, type, category);
+      if (splitWithPartner && partnerProfile) {
+        onAddTransaction(desc, parsedAmount, type, category, partnerProfile.id, parsedAmount / 2);
+      } else {
+        onAddTransaction(desc, parsedAmount, type, category);
+      }
     }
-    setDesc(''); setAmount(''); setSearchQuery(''); setSplitWithPartner(false); setShowAddModal(false);
+    
+    setEditingTx(null);
+    setDesc('');
+    setAmount('');
+    setCategory('');
+    setSearchQuery('');
+    setSplitWithPartner(false);
+    setShowAddModal(false);
   };
 
   const handleSaveBalanceAdjust = (e: React.FormEvent) => {
@@ -482,7 +545,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   padding: '0.75rem 0', borderBottom: '1px solid var(--border-color)',
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0, flex: 1 }}>
                   <div style={{
                     width: '34px', height: '34px', borderRadius: '50%', flexShrink: 0,
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -499,9 +562,37 @@ export const Dashboard: React.FC<DashboardProps> = ({
                     </span>
                   </div>
                 </div>
-                <span className="num" style={{ fontWeight: 650, fontSize: '0.875rem', flexShrink: 0, marginLeft: '12px', color: tx.type === 'income' ? 'var(--emerald-gains)' : 'var(--coral-losses)' }}>
-                  {tx.type === 'income' ? '+' : '−'} Rs. {tx.amount.toLocaleString('en-US')}
-                </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span className="num" style={{ fontWeight: 650, fontSize: '0.875rem', flexShrink: 0, color: tx.type === 'income' ? 'var(--emerald-gains)' : 'var(--coral-losses)' }}>
+                    {tx.type === 'income' ? '+' : '−'} Rs. {tx.amount.toLocaleString('en-US')}
+                  </span>
+                  <div style={{ display: 'flex', gap: '4px', marginLeft: '4px' }}>
+                    <button
+                      type="button"
+                      onClick={() => handleStartEdit(tx)}
+                      className="icon-btn"
+                      style={{ width: '26px', height: '26px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--nav-pill-bg)', borderRadius: '6px', border: '1px solid var(--border-color)', cursor: 'pointer' }}
+                      title="Edit entry"
+                    >
+                      <Edit2 size={11} style={{ color: 'var(--ink-muted)' }} />
+                    </button>
+                    {onDeleteTransaction && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (confirm(`Delete "${tx.description}"?`)) {
+                            onDeleteTransaction(tx.id);
+                          }
+                        }}
+                        className="icon-btn icon-btn-danger"
+                        style={{ width: '26px', height: '26px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--coral-losses-bg)', borderRadius: '6px', border: '1px solid rgba(232, 93, 93, 0.15)', cursor: 'pointer' }}
+                        title="Delete entry"
+                      >
+                        <Trash2 size={11} style={{ color: 'var(--coral-losses)' }} />
+                      </button>
+                    )}
+                  </div>
+                </div>
               </motion.div>
             ))}
             {transactions.length > 5 && (
@@ -527,38 +618,42 @@ export const Dashboard: React.FC<DashboardProps> = ({
             transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
             style={{ ...MODAL_CARD, maxWidth: '400px', overflowY: 'auto', maxHeight: '90vh' }}
           >
-            <h3 style={{ fontSize: '1.5rem', fontWeight: 400, fontStyle: 'italic', fontFamily: 'var(--font-serif)', color: 'var(--ink-color)', marginBottom: '1rem' }}>Log Entry</h3>
+            <h3 style={{ fontSize: '1.5rem', fontWeight: 400, fontStyle: 'italic', fontFamily: 'var(--font-serif)', color: 'var(--ink-color)', marginBottom: '1rem' }}>
+              {editingTx ? 'Edit Entry' : 'Log Entry'}
+            </h3>
 
-            {/* Receipt scan zone */}
-            <div style={{ marginBottom: '1rem' }}>
-              <label
-                htmlFor="receipt-upload"
-                style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '1rem', borderRadius: '0.75rem', border: '1.5px dashed var(--border-color)', background: 'var(--nav-pill-bg)', cursor: 'pointer' }}
-              >
-                <input
-                  type="file" id="receipt-upload" accept="image/*"
-                  onChange={handleReceiptScan} style={{ display: 'none' }} disabled={isScanning}
-                />
-                {isScanning ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', width: '100%', textAlign: 'center' }}>
-                    <Loader2 size={20} style={{ color: 'var(--emerald-gains)', animation: 'spin 1s linear infinite' }} />
-                    <span style={{ fontSize: '0.75rem', fontWeight: 500, color: 'var(--ink-muted)' }}>Analyzing receipt ({scanProgress}%)</span>
-                    <div style={{ width: '100%', height: '4px', borderRadius: '2px', background: 'var(--border-color)', overflow: 'hidden', marginTop: '4px' }}>
-                      <motion.div style={{ height: '100%', background: 'var(--emerald-gains)', borderRadius: '2px', width: `${scanProgress}%` }} layout />
+            {/* Receipt scan zone (only show when creating, not editing) */}
+            {!editingTx && (
+              <div style={{ marginBottom: '1rem' }}>
+                <label
+                  htmlFor="receipt-upload"
+                  style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '1rem', borderRadius: '0.75rem', border: '1.5px dashed var(--border-color)', background: 'var(--nav-pill-bg)', cursor: 'pointer' }}
+                >
+                  <input
+                    type="file" id="receipt-upload" accept="image/*"
+                    onChange={handleReceiptScan} style={{ display: 'none' }} disabled={isScanning}
+                  />
+                  {isScanning ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', width: '100%', textAlign: 'center' }}>
+                      <Loader2 size={20} style={{ color: 'var(--emerald-gains)', animation: 'spin 1s linear infinite' }} />
+                      <span style={{ fontSize: '0.75rem', fontWeight: 550, color: 'var(--ink-muted)' }}>Analyzing receipt ({scanProgress}%)</span>
+                      <div style={{ width: '100%', height: '4px', borderRadius: '2px', background: 'var(--border-color)', overflow: 'hidden', marginTop: '4px' }}>
+                        <motion.div style={{ height: '100%', background: 'var(--emerald-gains)', borderRadius: '2px', width: `${scanProgress}%` }} layout />
+                      </div>
                     </div>
-                  </div>
-                ) : (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', fontWeight: 500, color: 'var(--ink-muted)' }}>
-                    <Camera size={14} /><span>Scan Receipt (AI Auto-Fill)</span>
+                  ) : (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', fontWeight: 550, color: 'var(--ink-muted)' }}>
+                      <Camera size={14} /><span>Scan Receipt (AI Auto-Fill)</span>
+                    </div>
+                  )}
+                </label>
+                {scanError && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '5px', color: 'var(--coral-losses)', fontSize: '0.75rem', marginTop: '6px' }}>
+                    <AlertCircle size={12} /><span>{scanError}</span>
                   </div>
                 )}
-              </label>
-              {scanError && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '5px', color: 'var(--coral-losses)', fontSize: '0.75rem', marginTop: '6px' }}>
-                  <AlertCircle size={12} /><span>{scanError}</span>
-                </div>
-              )}
-            </div>
+              </div>
+            )}
 
             <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               {/* Type toggle */}
@@ -603,7 +698,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
               </div>
 
               {/* Category dropdown */}
-              <div className="input-group" style={{ position: 'relative' }}>
+              <div className="input-group">
                 <label className="input-label">Category</label>
                 <button
                   type="button"
@@ -615,45 +710,42 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   <ChevronDown size={14} style={{ color: 'var(--ink-muted)', transform: dropdownOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
                 </button>
                 {dropdownOpen && (
-                  <>
-                    <div style={{ position: 'fixed', inset: 0, zIndex: 99 }} onClick={() => setDropdownOpen(false)} />
-                    <motion.div
-                      initial={{ opacity: 0, y: 4, scale: 0.98 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      transition={{ duration: 0.15 }}
-                      style={{ position: 'absolute', top: '100%', left: 0, right: 0, marginTop: '4px', background: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '12px', boxShadow: '0 8px 32px rgba(0,0,0,0.12)', zIndex: 100, padding: '10px', display: 'flex', flexDirection: 'column', gap: '6px' }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '6px 10px', background: 'var(--nav-pill-bg)' }}>
-                        <Search size={13} style={{ color: 'var(--ink-light)', flexShrink: 0 }} />
-                        <input
-                          type="text" placeholder="Search or type custom..."
-                          value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
-                          onClick={(e) => e.stopPropagation()}
-                          style={{ background: 'transparent', border: 'none', outline: 'none', color: 'var(--ink-color)', fontSize: '0.78rem', width: '100%' }}
-                        />
-                      </div>
-                      <div style={{ maxHeight: '9rem', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                        {searchQuery.trim() !== '' && !categories.some(c => c.toLowerCase() === searchQuery.trim().toLowerCase()) && (
-                          <button
-                            type="button"
-                            onClick={() => { setCategory(searchQuery.trim()); setDropdownOpen(false); }}
-                            style={{ width: '100%', textAlign: 'left', padding: '7px 10px', borderRadius: '8px', background: 'var(--emerald-gains-bg)', color: 'var(--emerald-gains)', fontSize: '0.78rem', fontWeight: 600, border: 'none', cursor: 'pointer' }}
-                          >
-                            + Create "{searchQuery.trim()}"
-                          </button>
-                        )}
-                        {categories.filter(c => c.toLowerCase().includes(searchQuery.toLowerCase())).map((c) => (
-                          <button
-                            key={c} type="button"
-                            onClick={() => { setCategory(c); setDropdownOpen(false); }}
-                            style={{ width: '100%', textAlign: 'left', padding: '7px 10px', borderRadius: '8px', fontSize: '0.82rem', border: 'none', cursor: 'pointer', fontWeight: category === c ? 600 : 400, background: category === c ? 'var(--border-color)' : 'transparent', color: category === c ? 'var(--ink-color)' : 'var(--ink-muted)' }}
-                          >
-                            {c}
-                          </button>
-                        ))}
-                      </div>
-                    </motion.div>
-                  </>
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    transition={{ duration: 0.2, ease: 'easeOut' }}
+                    style={{ marginTop: '8px', background: 'var(--nav-pill-bg)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '10px', display: 'flex', flexDirection: 'column', gap: '6px', overflow: 'hidden' }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '6px 10px', background: 'var(--card-bg)' }}>
+                      <Search size={13} style={{ color: 'var(--ink-light)', flexShrink: 0 }} />
+                      <input
+                        type="text" placeholder="Search or type custom..."
+                        value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
+                        onClick={(e) => e.stopPropagation()}
+                        style={{ background: 'transparent', border: 'none', outline: 'none', color: 'var(--ink-color)', fontSize: '0.78rem', width: '100%' }}
+                      />
+                    </div>
+                    <div style={{ maxHeight: '9rem', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                      {searchQuery.trim() !== '' && !categories.some(c => c.toLowerCase() === searchQuery.trim().toLowerCase()) && (
+                        <button
+                          type="button"
+                          onClick={() => { setCategory(searchQuery.trim()); setDropdownOpen(false); }}
+                          style={{ width: '100%', textAlign: 'left', padding: '7px 10px', borderRadius: '8px', background: 'var(--emerald-gains-bg)', color: 'var(--emerald-gains)', fontSize: '0.78rem', fontWeight: 600, border: 'none', cursor: 'pointer' }}
+                        >
+                          + Create "{searchQuery.trim()}"
+                        </button>
+                      )}
+                      {categories.filter(c => c.toLowerCase().includes(searchQuery.toLowerCase())).map((c) => (
+                        <button
+                          key={c} type="button"
+                          onClick={() => { setCategory(c); setDropdownOpen(false); }}
+                          style={{ width: '100%', textAlign: 'left', padding: '7px 10px', borderRadius: '8px', fontSize: '0.82rem', border: 'none', cursor: 'pointer', fontWeight: category === c ? 600 : 400, background: category === c ? 'var(--border-color)' : 'transparent', color: category === c ? 'var(--ink-color)' : 'var(--ink-muted)' }}
+                        >
+                          {c}
+                        </button>
+                      ))}
+                    </div>
+                  </motion.div>
                 )}
               </div>
 
@@ -681,8 +773,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
               )}
 
               <div style={{ display: 'flex', gap: '10px', marginTop: '4px' }}>
-                <button type="button" onClick={() => setShowAddModal(false)} className="btn btn-secondary" style={{ flex: 1 }}>Cancel</button>
-                <button type="submit" className="btn btn-primary" style={{ flex: 1 }}>Log Entry</button>
+                <button type="button" onClick={handleModalClose} className="btn btn-secondary" style={{ flex: 1 }}>Cancel</button>
+                <button type="submit" className="btn btn-primary" style={{ flex: 1 }}>
+                  {editingTx ? 'Save Changes' : 'Log Entry'}
+                </button>
               </div>
             </form>
           </motion.div>

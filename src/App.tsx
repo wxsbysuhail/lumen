@@ -341,164 +341,104 @@ function App() {
     return () => subscription.unsubscribe();
   }, []);
 
-  const checkAndApplyRecurringIncomes = async (
+  const checkAndApplyRecurringItems = async (
     profile: any,
     recurringItems: any[],
+    existingTransactions: any[],
     userId: string
   ) => {
-    // 1. Calculate latest occurred 26th
     const now = new Date();
-    let targetYear = now.getFullYear();
-    let targetMonth = now.getMonth(); // 0-indexed
-    if (now.getDate() < 26) {
-      targetMonth -= 1;
-      if (targetMonth < 0) {
-        targetMonth = 11;
-        targetYear -= 1;
+    const currentDay = now.getDate();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth(); // 0-indexed (Jan = 0)
+
+    let balanceAdjust = 0;
+    const transactionsToAdd: any[] = [];
+
+    for (const item of recurringItems) {
+      const match = item.description.match(/\[due:(\d+)\]/);
+      const defaultDueDay = /base|salary|transport/i.test(item.description) ? 26 : 1;
+      const dueDay = match ? parseInt(match[1], 10) : defaultDueDay;
+
+      // If today is on or after the due day
+      if (currentDay >= dueDay) {
+        const rawDesc = item.description.replace(/\s*\[due:\d+\]/, '').trim();
+        
+        const alreadyApplied = existingTransactions.some(tx => {
+          const txDate = new Date(tx.date);
+          const txDesc = tx.description.replace(/\s*\[due:\d+\]/, '').trim();
+          return (
+            txDesc.toLowerCase() === rawDesc.toLowerCase() &&
+            tx.type === item.type &&
+            txDate.getMonth() === currentMonth &&
+            txDate.getFullYear() === currentYear
+          );
+        });
+
+        if (!alreadyApplied) {
+          const impact = item.type === 'income' ? Number(item.amount) : -Number(item.amount);
+          balanceAdjust += impact;
+
+          // Construct target date for the ledger: YYYY-MM-DD
+          const monthStr = String(currentMonth + 1).padStart(2, '0');
+          const dayStr = String(dueDay).padStart(2, '0');
+          const dateStr = `${currentYear}-${monthStr}-${dayStr}T12:00:00.000Z`;
+
+          transactionsToAdd.push({
+            user_id: userId,
+            description: rawDesc,
+            amount: Number(item.amount),
+            type: item.type,
+            category: item.category,
+            date: dateStr
+          });
+        }
       }
     }
-    const latest26thStr = `${targetYear}-${String(targetMonth + 1).padStart(2, '0')}`;
-    const lastApplied = profile.last_recurring_applied_month;
 
-    if (!lastApplied) {
-      // First time initialization: set to latest26thStr without applying to avoid double-charging start balance
+    if (transactionsToAdd.length > 0) {
       try {
-        const { data: updatedProfiles } = await supabase
-          .from('profiles')
-          .update({ last_recurring_applied_month: latest26thStr })
-          .eq('id', userId)
-          .is('last_recurring_applied_month', null)
-          .select();
-        if (updatedProfiles && updatedProfiles.length > 0) {
-          console.log(`Initialized last_recurring_applied_month to ${latest26thStr}`);
-        }
-      } catch (err) {
-        console.error('Error initializing recurring applied month:', err);
-      }
-      return;
-    }
-
-    if (lastApplied >= latest26thStr) {
-      // Already fully applied for the latest monthly cycle
-      return;
-    }
-
-    // 2. Find salary and transport allowance in active recurring items
-    const salaryItem = recurringItems.find(item => 
-      item.type === 'income' && /base|salary/i.test(item.description)
-    );
-    const transportItem = recurringItems.find(item => 
-      item.type === 'income' && /transport/i.test(item.description)
-    );
-
-    const salaryAmt = salaryItem ? Number(salaryItem.amount) : 0;
-    const transportAmt = transportItem ? Number(transportItem.amount) : 0;
-    const totalToAddPerMonth = salaryAmt + transportAmt;
-
-    if (totalToAddPerMonth <= 0) return;
-
-    // 3. Find missing months (if user hasn't logged in for a while)
-    const getNextMonthStr = (monthStr: string) => {
-      const [year, month] = monthStr.split('-').map(Number);
-      let nextMonth = month + 1;
-      let nextYear = year;
-      if (nextMonth > 12) {
-        nextMonth = 1;
-        nextYear += 1;
-      }
-      return `${nextYear}-${String(nextMonth).padStart(2, '0')}`;
-    };
-
-    let currentMonth = lastApplied;
-    const monthsToApply: string[] = [];
-    while (currentMonth < latest26thStr) {
-      currentMonth = getNextMonthStr(currentMonth);
-      monthsToApply.push(currentMonth);
-    }
-
-    if (monthsToApply.length === 0) return;
-
-    const totalTransactionsAmount = totalToAddPerMonth * monthsToApply.length;
-    const newBalance = Number(profile.current_balance) + totalTransactionsAmount;
-
-    try {
-      // Update profile balance and last applied month tracker atomically using optimistic concurrency control
-      const { data: updatedProfiles, error: profileError } = await supabase
-        .from('profiles')
-        .update({
-          current_balance: newBalance,
-          last_recurring_applied_month: latest26thStr,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', userId)
-        .eq('last_recurring_applied_month', lastApplied)
-        .select();
-
-      if (profileError) throw profileError;
-
-      // If no profile was updated, it means another concurrent session did it first
-      if (!updatedProfiles || updatedProfiles.length === 0) {
-        console.log('Monthly recurring salary application was already processed concurrently.');
-        return;
-      }
-
-      // Create transaction logs for complete tracking integrity
-      const transactionsToAdd: any[] = [];
-      monthsToApply.forEach(month => {
-        if (salaryAmt > 0) {
-          transactionsToAdd.push({
-            user_id: userId,
-            description: salaryItem ? salaryItem.description : 'Base Salary',
-            amount: salaryAmt,
-            type: 'income',
-            category: 'income',
-            date: `${month}-26`
-          });
-        }
-        if (transportAmt > 0) {
-          transactionsToAdd.push({
-            user_id: userId,
-            description: transportItem ? transportItem.description : 'Transport Allowance',
-            amount: transportAmt,
-            type: 'income',
-            category: 'income',
-            date: `${month}-26`
-          });
-        }
-      });
-
-      if (transactionsToAdd.length > 0) {
         const { error: txError } = await supabase
           .from('transactions')
           .insert(transactionsToAdd);
-
         if (txError) throw txError;
+
+        const newBalance = Number(profile.current_balance) + balanceAdjust;
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .update({ current_balance: newBalance })
+          .eq('id', userId);
+        if (profileError) throw profileError;
+
+        // Update React state
+        setGeneralBalance(newBalance);
+
+        // Reload fresh transactions from ledger
+        const { data: newTxData } = await supabase
+          .from('transactions')
+          .select('*')
+          .eq('user_id', userId)
+          .order('date', { ascending: false });
+
+        if (newTxData) {
+          setTransactions(newTxData.map((tx: any) => ({
+            id: tx.id,
+            description: tx.description,
+            amount: Number(tx.amount),
+            type: tx.type,
+            category: tx.category,
+            date: tx.date,
+            split_with_id: tx.split_with_id,
+            split_amount: tx.split_amount ? Number(tx.split_amount) : undefined,
+            split_settled: tx.split_settled,
+            user_id: tx.user_id,
+          })));
+        }
+
+        console.log(`Successfully applied ${transactionsToAdd.length} automated monthly items:`, transactionsToAdd);
+      } catch (err) {
+        console.error('Error applying automated monthly items:', err);
       }
-
-      // Update React state
-      setGeneralBalance(newBalance);
-
-      // Reload transactions to reflect in ledger instantly
-      const { data: newTxData } = await supabase
-        .from('transactions')
-        .select('*')
-        .eq('user_id', userId)
-        .order('date', { ascending: false });
-
-      if (newTxData) {
-        setTransactions(newTxData.map((tx: any) => ({
-          id: tx.id,
-          description: tx.description,
-          amount: Number(tx.amount),
-          type: tx.type,
-          category: tx.category,
-          date: tx.date,
-        })));
-      }
-
-      console.log(`Successfully applied monthly recurring updates for: ${monthsToApply.join(', ')}`);
-    } catch (err) {
-      console.error('Error applying missing recurring items:', err);
     }
   };
 
@@ -630,10 +570,10 @@ function App() {
             })));
           }
 
-          // Apply automated monthly salary and allowance deposits on the 26th
+          // Apply automated monthly salary, subscriptions, leases, and allowance contracts on their respective due dates
           if (recRes.data) {
             const myRecItems = recRes.data.filter((item: any) => item.user_id === userId);
-            await checkAndApplyRecurringIncomes(profile, myRecItems, userId);
+            await checkAndApplyRecurringItems(profile, myRecItems, txRes.data || [], userId);
           }
         } else {
           setIsOnboarded(false);
@@ -890,6 +830,93 @@ function App() {
         .eq('id', session.user.id);
     } catch (err) {
       console.error('Error adding transaction:', err);
+    }
+  };
+
+  const handleUpdateTransaction = async (
+    id: string,
+    desc: string,
+    amount: number,
+    type: 'income' | 'expense',
+    category: string,
+    splitWithId?: string,
+    splitAmount?: number
+  ) => {
+    if (!session?.user) return;
+    try {
+      const oldTx = transactions.find(t => t.id === id);
+      if (!oldTx) return;
+
+      const updatedTx = {
+        description: desc,
+        amount,
+        type,
+        category,
+        split_with_id: splitWithId || null,
+        split_amount: splitAmount || null,
+      };
+
+      const { error } = await supabase
+        .from('transactions')
+        .update(updatedTx)
+        .eq('id', id);
+      if (error) throw error;
+
+      setTransactions(prev =>
+        prev.map(t =>
+          t.id === id
+            ? {
+                ...t,
+                description: desc,
+                amount,
+                type,
+                category,
+                split_with_id: splitWithId || undefined,
+                split_amount: splitAmount || undefined,
+              }
+            : t
+        )
+      );
+
+      const oldImpact = oldTx.type === 'income' ? oldTx.amount : -oldTx.amount;
+      const newImpact = type === 'income' ? amount : -amount;
+      const delta = newImpact - oldImpact;
+      const newBalance = generalBalance + delta;
+
+      setGeneralBalance(newBalance);
+      await supabase
+        .from('profiles')
+        .update({ current_balance: newBalance })
+        .eq('id', session.user.id);
+    } catch (err) {
+      console.error('Error updating transaction:', err);
+    }
+  };
+
+  const handleDeleteTransaction = async (id: string) => {
+    if (!session?.user) return;
+    try {
+      const oldTx = transactions.find(t => t.id === id);
+      if (!oldTx) return;
+
+      const { error } = await supabase
+        .from('transactions')
+        .delete()
+        .eq('id', id);
+      if (error) throw error;
+
+      setTransactions(prev => prev.filter(t => t.id !== id));
+
+      const oldImpact = oldTx.type === 'income' ? oldTx.amount : -oldTx.amount;
+      const newBalance = generalBalance - oldImpact;
+
+      setGeneralBalance(newBalance);
+      await supabase
+        .from('profiles')
+        .update({ current_balance: newBalance })
+        .eq('id', session.user.id);
+    } catch (err) {
+      console.error('Error deleting transaction:', err);
     }
   };
 
@@ -1490,6 +1517,8 @@ function App() {
                   goal={primaryGoal}
                   transactions={transactions}
                   onAddTransaction={handleAddTransaction}
+                  onUpdateTransaction={handleUpdateTransaction}
+                  onDeleteTransaction={handleDeleteTransaction}
                   savingsRate={currentSavingsRate}
                   totalBucketSavings={totalBucketSavings}
                   holdingsValue={getHoldingsValue()}
@@ -1568,6 +1597,8 @@ function App() {
                   transactions={transactions}
                   monthlyIncome={activeInflowSum || monthlyIncome}
                   generalBalance={generalBalance}
+                  onUpdateTransaction={handleUpdateTransaction}
+                  onDeleteTransaction={handleDeleteTransaction}
                 />
               )}
 
