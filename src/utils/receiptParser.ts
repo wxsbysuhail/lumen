@@ -176,87 +176,97 @@ export const parseOCRText = (
   
   // Standard parser for multi-line bank statement transaction rows
   if (mode === 'statement' || mode === 'auto') {
-    lines.forEach(line => {
-      // 1. Try to extract date
+    let currentDate = todayStr;
+
+    const getRelativeDateStr = (daysAgo: number): string => {
+      const d = new Date();
+      d.setDate(d.getDate() - daysAgo);
+      return d.toISOString().split('T')[0];
+    };
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+
+      // A. Check if line is just a date header
+      if (line.toLowerCase() === 'today') {
+        currentDate = todayStr;
+        continue;
+      }
+      if (line.toLowerCase() === 'yesterday') {
+        currentDate = getRelativeDateStr(1);
+        continue;
+      }
+
+      // Check standalone calendar date
       const dateInfo = extractDateFromLine(line);
-      if (!dateInfo) return;
+      if (dateInfo && line.replace(dateInfo.matchedText, '').trim().length < 3) {
+        currentDate = dateInfo.dateStr;
+        continue;
+      }
+
+      // B. Look for amount candidate on this line
+      const cleanLine = line.replace(/,/g, '');
+      // Match negative numbers, decimals, or standard integers
+      const amountMatches = cleanLine.match(/-?\d+\.\d{2}\b/) || cleanLine.match(/\b\d{2,}\b/);
       
-      // 2. Look for amounts (at least one number with 2 decimal places, or a number > 10)
-      // Strip the date from the line to avoid matching numbers in the date
-      const lineWithoutDate = line.replace(dateInfo.matchedText, ' ');
-      
-      // Extract numbers. Remove commas from line to match numbers like 1,500.00
-      const cleanLine = lineWithoutDate.replace(/,/g, '');
-      const amountMatches = cleanLine.match(/\b\d+\.\d{2}\b/g) || cleanLine.match(/\b\d{2,}\b/g);
-      
-      if (!amountMatches || amountMatches.length === 0) return;
-      
-      // Usually, if multiple amounts exist (e.g. transaction amount and running balance),
-      // the transaction amount is the first one or the second one, while the running balance is the last one.
-      // If there are words like "bal" or "balance" in the line, the final number is almost certainly the balance.
-      let amountIndex = 0;
-      if (amountMatches.length > 1) {
-        if (/bal/i.test(lineWithoutDate)) {
-          // Exclude the last amount (running balance)
-          amountIndex = amountMatches.length - 2;
-        } else {
-          // If no balance keyword, take the largest or the first/last depending on position
-          // Usually, the first matches transaction amount, the second matches balance.
-          amountIndex = 0;
+      if (amountMatches) {
+        const amountStr = amountMatches[0];
+        const parsedAmount = Math.abs(parseFloat(amountStr));
+        if (isNaN(parsedAmount) || parsedAmount <= 1) continue;
+
+        let description = line.replace(amountStr, '').trim();
+
+        // Peek next line to check if it's the details/merchant line
+        if (i + 1 < lines.length) {
+          const nextLine = lines[i + 1];
+          const nextLineHasAmount = nextLine.replace(/,/g, '').match(/\d+\.\d{2}\b/) || nextLine.match(/\b\d{2,}\b/);
+          const nextLineIsDate = nextLine.toLowerCase() === 'today' || nextLine.toLowerCase() === 'yesterday' || extractDateFromLine(nextLine) !== null;
+
+          if (!nextLineHasAmount && !nextLineIsDate && nextLine.trim().length > 1) {
+            description += ' - ' + nextLine.trim();
+            i++; // skip next line
+          }
         }
+
+        // Determine Type (income or expense)
+        let type: 'income' | 'expense' = 'expense';
+        if (amountStr.includes('-') || line.includes('-')) {
+          type = 'expense';
+        } else {
+          const incomeKeywords = /\b(salary|credit|dep|deposit|interest|dividend|refund|cr|reversal|transfer\s+in|received)\b/i;
+          const expenseKeywords = /\b(debit|dr|payment|purchase|charge|fee|pos|withdrawal|transfer\s+out|cash\s+out)\b/i;
+          if (incomeKeywords.test(line) && !expenseKeywords.test(line)) {
+            type = 'income';
+          } else if (expenseKeywords.test(line) && !incomeKeywords.test(line)) {
+            type = 'expense';
+          } else {
+            type = 'expense'; // default fallback
+          }
+        }
+
+        // Clean description
+        description = description
+          .replace(/[\d,.]/g, '') // remove stray digits
+          .replace(/\b(cr|dr|mur|rs|usd|eur|bal|balance)\b/gi, '') // remove currency/meta
+          .replace(/[+\-*|/:_]/g, ' ') // remove symbols
+          .replace(/\s+/g, ' ') // collapse whitespaces
+          .trim();
+
+        if (description.length < 2) {
+          description = type === 'income' ? 'Deposit Transaction' : 'Purchase Transaction';
+        }
+
+        const category = suggestCategory(description, type);
+
+        results.push({
+          date: currentDate,
+          description,
+          amount: parsedAmount,
+          type,
+          category
+        });
       }
-      
-      const parsedAmount = parseFloat(amountMatches[amountIndex]);
-      if (isNaN(parsedAmount) || parsedAmount <= 0) return;
-      
-      // Determine Type (income or expense)
-      let type: 'income' | 'expense' = 'expense';
-      const incomeKeywords = /\b(salary|credit|dep|deposit|interest|dividend|refund|cr|reversal|transfer\s+in|received)\b/i;
-      const expenseKeywords = /\b(debit|dr|payment|purchase|charge|fee|pos|withdrawal|transfer\s+out|cash\s+out)\b/i;
-      
-      // If line contains direct sign indicator, e.g. "+" or "-" or "CR" / "DR"
-      const crMatch = /\bcr\b/i.test(lineWithoutDate) || lineWithoutDate.includes('+');
-      const drMatch = /\bdr\b/i.test(lineWithoutDate) || lineWithoutDate.includes('-');
-      
-      if (crMatch && !drMatch) {
-        type = 'income';
-      } else if (drMatch && !crMatch) {
-        type = 'expense';
-      } else if (incomeKeywords.test(lineWithoutDate) && !expenseKeywords.test(lineWithoutDate)) {
-        type = 'income';
-      } else if (expenseKeywords.test(lineWithoutDate) && !incomeKeywords.test(lineWithoutDate)) {
-        type = 'expense';
-      }
-      
-      // 3. Extract description
-      // Remove date match and all amount matches from the line
-      let description = lineWithoutDate;
-      amountMatches.forEach(m => {
-        description = description.replace(m, ' ');
-      });
-      
-      // Clean description from extra characters
-      description = description
-        .replace(/[\d,.]/g, '') // remove remaining stray digits/dots
-        .replace(/\b(cr|dr|mur|rs|usd|eur|bal|balance)\b/gi, '') // remove currency and metadata
-        .replace(/[+\-*|/:_]/g, ' ') // remove dividers
-        .replace(/\s+/g, ' ') // collapse whitespaces
-        .trim();
-        
-      if (description.length < 2) {
-        description = type === 'income' ? 'Deposit Transaction' : 'Purchase Transaction';
-      }
-      
-      const category = suggestCategory(description, type);
-      
-      results.push({
-        date: dateInfo.dateStr,
-        description,
-        amount: parsedAmount,
-        type,
-        category
-      });
-    });
+    }
   }
   
   // If we wanted a single receipt, or statement parsing yielded nothing and mode was auto
