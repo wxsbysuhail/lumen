@@ -218,13 +218,26 @@ export const parseOCRText = (
 
       // B. Look for amount candidate on this line
       const cleanLine = line.replace(/,/g, '');
-      // Prefer explicit decimal amounts; fall back to plain integers but NEVER treat a 4-digit year as an amount
-      const decimalMatch = cleanLine.match(/-?\d+\.\d{2}\b/);
-      const integerMatch = cleanLine.match(/\b(\d{2,3})\b/); // max 3 digits to avoid catching years like 2026
-      const amountMatches = decimalMatch || integerMatch;
+      // Match decimals with optional sign prefix (e.g. +250.00 or -150.00)
+      const decimalMatch = cleanLine.match(/[-+]?\d+\.\d{2}\b/);
+      let amountStr = '';
+      if (decimalMatch) {
+        amountStr = decimalMatch[0];
+      } else {
+        // Fall back to plain integers, but ignore years between 2020 and 2035
+        const integerMatches = cleanLine.match(/\b[-+]?\d{2,}\b/g);
+        if (integerMatches) {
+          const nonYearMatch = integerMatches.find(m => {
+            const val = Math.abs(parseInt(m.replace(/[-+]/g, ''), 10));
+            return val < 2020 || val > 2035;
+          });
+          if (nonYearMatch) {
+            amountStr = nonYearMatch;
+          }
+        }
+      }
       
-      if (amountMatches) {
-        const amountStr = amountMatches[0];
+      if (amountStr) {
         const parsedAmount = Math.abs(parseFloat(amountStr));
         if (isNaN(parsedAmount) || parsedAmount <= 1) continue;
 
@@ -244,17 +257,35 @@ export const parseOCRText = (
 
         // Determine Type (income or expense)
         let type: 'income' | 'expense' = 'expense';
-        if (amountStr.includes('-') || line.includes('-')) {
+        const lowerLine = line.toLowerCase();
+        
+        // 1. Explicit signs in amount or line take highest precedence
+        if (amountStr.startsWith('+') || line.includes('+')) {
+          type = 'income';
+        } else if (amountStr.startsWith('-') || line.includes('-')) {
           type = 'expense';
         } else {
-          const incomeKeywords = /\b(salary|credit|dep|deposit|interest|dividend|refund|cr|reversal|transfer\s+in|received)\b/i;
-          const expenseKeywords = /\b(debit|dr|payment|purchase|charge|fee|pos|withdrawal|transfer\s+out|cash\s+out)\b/i;
-          if (incomeKeywords.test(line) && !expenseKeywords.test(line)) {
+          // 2. Keyword detection
+          const incomeKeywords = /\b(salary|credit|dep|deposit|interest|dividend|refund|cr|reversal|transfer\s+in|received|cash\s+in|inflow|plus|credited|cashback)\b/i;
+          const expenseKeywords = /\b(debit|dr|payment|purchase|charge|fee|pos|withdrawal|transfer\s+out|cash\s+out|sent|debited|outflow|minus|paid)\b/i;
+          
+          if (incomeKeywords.test(lowerLine) && !expenseKeywords.test(lowerLine)) {
             type = 'income';
-          } else if (expenseKeywords.test(line) && !incomeKeywords.test(line)) {
+          } else if (expenseKeywords.test(lowerLine) && !incomeKeywords.test(lowerLine)) {
             type = 'expense';
           } else {
-            type = 'expense'; // default fallback
+            // Juice Transfer context
+            if (lowerLine.includes('juice')) {
+              if (lowerLine.includes('received') || lowerLine.includes('from')) {
+                type = 'income';
+              } else if (lowerLine.includes('sent') || lowerLine.includes('to') || lowerLine.includes('payment')) {
+                type = 'expense';
+              } else {
+                type = 'expense'; // Default juice transfer to expense
+              }
+            } else {
+              type = 'expense'; // Default fallback
+            }
           }
         }
 
