@@ -2,10 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { motion, useMotionValue, useTransform, animate } from 'framer-motion';
 import {
   ArrowUpRight, ArrowDownRight, Plus, Calendar, TrendingUp, Edit2, Trash2,
-  ChevronDown, Search, Wallet, PiggyBank, Info, Camera, Loader2, AlertCircle,
+  ChevronDown, Search, Wallet, PiggyBank, Info, Camera,
 } from 'lucide-react';
-import { createWorker } from 'tesseract.js';
-import { parseReceiptText } from '../utils/receiptParser';
 import { cn } from '../utils/cn';
 
 interface Transaction {
@@ -54,6 +52,7 @@ interface DashboardProps {
   partnerProfile?: { id: string; name: string; email: string } | null;
   streak?: number;
   loggedToday?: boolean;
+  onTriggerScanImport?: () => void;
 }
 
 // ── Shared style helpers ────────────────────────────────────────────────────
@@ -100,6 +99,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   partnerProfile = null,
   streak = 0,
   loggedToday = false,
+  onTriggerScanImport,
 }) => {
   // ── Modal / form state ────────────────────────────────────────────────────
   const [showAddModal, setShowAddModal]           = useState(false);
@@ -114,9 +114,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const [showSafeToSpendModal, setShowSafeToSpendModal] = useState(false);
   const [dropdownOpen, setDropdownOpen]           = useState(false);
   const [searchQuery, setSearchQuery]             = useState('');
-  const [isScanning, setIsScanning]               = useState(false);
-  const [scanProgress, setScanProgress]           = useState(0);
-  const [scanError, setScanError]                 = useState('');
 
   useEffect(() => {
     if (!showAddModal) {
@@ -158,32 +155,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
     setCategory('');
     setSplitWithPartner(false);
     setShowAddModal(false);
-  };
-
-  // ── OCR receipt scan ──────────────────────────────────────────────────────
-  const handleReceiptScan = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setIsScanning(true); setScanProgress(0); setScanError('');
-    try {
-      const worker = await createWorker('eng', 1, {
-        logger: m => { if (m.status === 'recognizing text') setScanProgress(Math.round(m.progress * 100)); },
-      });
-      const { data: { text } } = await worker.recognize(file);
-      await worker.terminate();
-      if (!text || text.trim() === '') throw new Error('No readable text detected in receipt.');
-      const parsed = parseReceiptText(text);
-      setDesc(parsed.description);
-      if (parsed.amount > 0) handleCurrencyChange(parsed.amount.toString(), setAmount);
-      else setAmount('');
-      setType('expense');
-      setCategory(parsed.category);
-    } catch (err: any) {
-      console.error('OCR Error:', err);
-      setScanError(err.message || 'Scanning failed. Please enter details manually.');
-    } finally {
-      setIsScanning(false);
-    }
   };
 
   // ── Currency input formatter ──────────────────────────────────────────────
@@ -626,35 +597,26 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </h3>
 
             {/* Receipt scan zone (only show when creating, not editing) */}
-            {!editingTx && (
+            {!editingTx && onTriggerScanImport && (
               <div style={{ marginBottom: '1rem' }}>
-                <label
-                  htmlFor="receipt-upload"
-                  style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '1rem', borderRadius: '0.75rem', border: '1.5px dashed var(--border-color)', background: 'var(--nav-pill-bg)', cursor: 'pointer' }}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowAddModal(false);
+                    onTriggerScanImport();
+                  }}
+                  style={{
+                    display: 'flex', width: '100%', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                    padding: '0.85rem', borderRadius: '0.75rem', border: '1.5px dashed var(--border-color)',
+                    background: 'var(--nav-pill-bg)', color: 'var(--ink-muted)', cursor: 'pointer',
+                    fontSize: '0.78rem', fontWeight: 550, outline: 'none'
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.borderColor = 'var(--ink-color)'}
+                  onMouseLeave={(e) => e.currentTarget.style.borderColor = 'var(--border-color)'}
                 >
-                  <input
-                    type="file" id="receipt-upload" accept="image/*"
-                    onChange={handleReceiptScan} style={{ display: 'none' }} disabled={isScanning}
-                  />
-                  {isScanning ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', width: '100%', textAlign: 'center' }}>
-                      <Loader2 size={20} style={{ color: 'var(--emerald-gains)', animation: 'spin 1s linear infinite' }} />
-                      <span style={{ fontSize: '0.75rem', fontWeight: 550, color: 'var(--ink-muted)' }}>Analyzing receipt ({scanProgress}%)</span>
-                      <div style={{ width: '100%', height: '4px', borderRadius: '2px', background: 'var(--border-color)', overflow: 'hidden', marginTop: '4px' }}>
-                        <motion.div style={{ height: '100%', background: 'var(--emerald-gains)', borderRadius: '2px', width: `${scanProgress}%` }} layout />
-                      </div>
-                    </div>
-                  ) : (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', fontWeight: 550, color: 'var(--ink-muted)' }}>
-                      <Camera size={14} /><span>Scan Receipt (AI Auto-Fill)</span>
-                    </div>
-                  )}
-                </label>
-                {scanError && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '5px', color: 'var(--coral-losses)', fontSize: '0.75rem', marginTop: '6px' }}>
-                    <AlertCircle size={12} /><span>{scanError}</span>
-                  </div>
-                )}
+                  <Camera size={14} />
+                  <span>Scan Receipt or Bank Screenshot</span>
+                </button>
               </div>
             )}
 

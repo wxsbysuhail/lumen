@@ -11,6 +11,7 @@ import { Reports } from './components/Reports';
 import { JointSync } from './components/JointSync';
 import { AICoach } from './components/AICoach';
 import { Login } from './components/Login';
+import { ScanImportModal } from './components/ScanImportModal';
 import { supabase } from './supabaseClient';
 import { useNotifications } from './hooks/useNotifications';
 
@@ -33,6 +34,7 @@ import {
   Bot,
   Bell,
   BellOff,
+  Camera,
 } from 'lucide-react';
 
 interface Transaction {
@@ -171,6 +173,7 @@ function App() {
   // Navigation
   const [activeTab, setActiveTab] = useState<'dashboard' | 'cashflow' | 'savings' | 'investments' | 'projection' | 'reports' | 'insights' | 'joint' | 'assistant'>('dashboard');
   const [showMoreHub, setShowMoreHub] = useState(false);
+  const [showScanImportModal, setShowScanImportModal] = useState(false);
   const [hideNav, setHideNav] = useState(false);
 
   // Theme state
@@ -830,6 +833,86 @@ function App() {
         .eq('id', session.user.id);
     } catch (err) {
       console.error('Error adding transaction:', err);
+    }
+  };
+
+  const handleBulkAddTransactions = async (
+    items: {
+      description: string;
+      amount: number;
+      type: 'income' | 'expense';
+      category: string;
+      date: string;
+      splitWithPartner?: boolean;
+    }[]
+  ) => {
+    if (!session?.user || items.length === 0) return;
+    try {
+      let balanceDiff = 0;
+      const transactionsToAdd = items.map(tx => {
+        const amt = tx.amount;
+        const diff = tx.type === 'income' ? amt : -amt;
+        balanceDiff += diff;
+
+        let split_amount = null;
+        let split_with_id = null;
+        if (tx.splitWithPartner && partnerProfile) {
+          split_with_id = partnerProfile.id;
+          split_amount = amt / 2;
+        }
+
+        let isoDate = new Date().toISOString();
+        if (tx.date) {
+          const parsed = new Date(tx.date + 'T12:00:00'); // set mid-day to avoid offset issues
+          if (!isNaN(parsed.getTime())) {
+            isoDate = parsed.toISOString();
+          }
+        }
+
+        return {
+          user_id: session.user.id,
+          description: tx.description,
+          amount: amt,
+          type: tx.type,
+          category: tx.category,
+          date: isoDate,
+          split_with_id,
+          split_amount,
+          split_settled: tx.splitWithPartner ? false : null,
+        };
+      });
+
+      const { data: txData, error: txError } = await supabase
+        .from('transactions')
+        .insert(transactionsToAdd)
+        .select();
+      if (txError) throw txError;
+
+      const insertedTxs: Transaction[] = txData.map((t: any) => ({
+        id: t.id,
+        description: t.description,
+        amount: Number(t.amount),
+        type: t.type,
+        category: t.category,
+        date: t.date,
+        split_with_id: t.split_with_id,
+        split_amount: t.split_amount ? Number(t.split_amount) : undefined,
+        split_settled: t.split_settled,
+        user_id: t.user_id,
+      }));
+
+      setTransactions(prev => [...insertedTxs, ...prev]);
+
+      const newBalance = generalBalance + balanceDiff;
+      setGeneralBalance(newBalance);
+
+      await supabase
+        .from('profiles')
+        .update({ current_balance: newBalance })
+        .eq('id', session.user.id);
+    } catch (err) {
+      console.error('Error adding bulk transactions:', err);
+      throw err;
     }
   };
 
@@ -1525,9 +1608,9 @@ function App() {
                   onNavigate={navigateTo}
                   recurringExpenses={activeOutflowSum}
                   savingsTargetsSum={savingsTargetsSum}
-                  partnerProfile={partnerProfile}
                   streak={streak}
                   loggedToday={loggedToday}
+                  onTriggerScanImport={() => setShowScanImportModal(true)}
                 />
               )}
 
@@ -1787,6 +1870,19 @@ function App() {
                       </button>
 
                       <button
+                        className="hub-card"
+                        onClick={() => { setShowMoreHub(false); setShowScanImportModal(true); }}
+                      >
+                        <div className="hub-card-icon-wrapper" style={{ color: 'var(--emerald-gains)' }}>
+                          <Camera size={18} />
+                        </div>
+                        <div className="hub-card-text">
+                          <div className="hub-card-name">Scan & Import (OCR)</div>
+                          <div className="hub-card-desc">Scan receipts or screenshots of bank accounts.</div>
+                        </div>
+                      </button>
+
+                      <button
                         className={`hub-card ${activeTab === 'assistant' ? 'active' : ''}`}
                         onClick={() => navigateTo('assistant')}
                         style={{ gridColumn: '1 / -1' }}
@@ -1932,6 +2028,16 @@ function App() {
             )}
           </AnimatePresence>
 
+          <AnimatePresence>
+            {showScanImportModal && (
+              <ScanImportModal
+                isOpen={showScanImportModal}
+                onClose={() => setShowScanImportModal(false)}
+                onBulkAdd={handleBulkAddTransactions}
+                partnerProfile={partnerProfile}
+              />
+            )}
+          </AnimatePresence>
         </div>
       )}
     </>
