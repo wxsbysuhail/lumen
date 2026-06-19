@@ -126,6 +126,8 @@ export const parseOCRText = (
   const regexDateSlashDotDash = /\b(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{2,4})\b/; // 15/06/2026 or 15-06-26 or 15.06.26
   const regexDateIso = /\b(\d{4})[/\-.](\d{1,2})[/\-.](\d{1,2})\b/; // 2026-06-15
   const regexDateTextual = /\b(\d{1,2})\s+([A-Za-z]{3,9})\s*(\d{2,4})?\b/i; // 15 Jun 2026 or 15 June 26 or 15 June
+  // MUST come before regexDateTextualReverse so the year is captured in matchedText
+  const regexDateMonthDayYear = /\b([A-Za-z]{3,9})\s+(\d{1,2})[,\s]+(\d{4})\b/i; // Jun 17, 2026 or Jun 17 2026
   const regexDateTextualReverse = /\b([A-Za-z]{3,9})\s+(\d{1,2})\b/i; // Jun 15
   
   // Helper to extract a date from a line
@@ -160,6 +162,16 @@ export const parseOCRText = (
       }
     }
     
+    // Check "Jun 17, 2026" BEFORE the year-less reverse so the full string (incl. year) is matchedText
+    match = line.match(regexDateMonthDayYear);
+    if (match) {
+      const monthWord = match[1].toLowerCase().slice(0, 3);
+      const month = MONTH_MAP[monthWord];
+      if (month) {
+        return { dateStr: formatDate(match[3], month, match[2]), matchedText: match[0] };
+      }
+    }
+
     match = line.match(regexDateTextualReverse);
     if (match) {
       const monthWord = match[1].toLowerCase().slice(0, 3);
@@ -206,8 +218,10 @@ export const parseOCRText = (
 
       // B. Look for amount candidate on this line
       const cleanLine = line.replace(/,/g, '');
-      // Match negative numbers, decimals, or standard integers
-      const amountMatches = cleanLine.match(/-?\d+\.\d{2}\b/) || cleanLine.match(/\b\d{2,}\b/);
+      // Prefer explicit decimal amounts; fall back to plain integers but NEVER treat a 4-digit year as an amount
+      const decimalMatch = cleanLine.match(/-?\d+\.\d{2}\b/);
+      const integerMatch = cleanLine.match(/\b(\d{2,3})\b/); // max 3 digits to avoid catching years like 2026
+      const amountMatches = decimalMatch || integerMatch;
       
       if (amountMatches) {
         const amountStr = amountMatches[0];
@@ -246,7 +260,9 @@ export const parseOCRText = (
 
         // Clean description
         description = description
-          .replace(/[\d,.]/g, '') // remove stray digits
+          .replace(/[\d,.]/g, '') // remove stray digits and commas
+          // Remove standalone month names left over from date headers parsed as transactions
+          .replace(/\b(january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|oct|nov|dec)\b/gi, '')
           .replace(/\b(cr|dr|mur|rs|usd|eur|bal|balance)\b/gi, '') // remove currency/meta
           .replace(/[+\-*|/:_]/g, ' ') // remove symbols
           .replace(/\s+/g, ' ') // collapse whitespaces
